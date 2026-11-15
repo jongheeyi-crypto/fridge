@@ -569,6 +569,7 @@ body {
 .lunch-today { margin: 5px 0 0; font-size: 11.5px; font-weight: 700; color: #5C4C86; line-height: 1.5; }
 .lunch-day { margin: 8px 0 0; font-size: 12px; font-weight: 800; color: #4B3D73; letter-spacing: -0.2px; }
 .lunch-note { margin: 6px 0 0; font-size: 11.5px; line-height: 1.5; color: #8579A3; font-weight: 500; }
+.lunch-after { margin: 4px 0 0; font-size: 11.5px; line-height: 1.5; color: #6F8A5A; font-weight: 700; }
 
 .menu-more { margin-top: 8px; }
 .menu-more summary {
@@ -1014,6 +1015,14 @@ body {
   line-height: 1.5;
   color: #A2875A;
   font-weight: 600;
+  word-break: keep-all;
+}
+.slot-after {
+  margin: 5px 0 0;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: #6F8A5A;
+  font-weight: 700;
   word-break: keep-all;
 }
 .school-avoid { color: #8B7BB0; }

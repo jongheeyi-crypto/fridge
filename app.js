@@ -315,14 +315,14 @@
   function clashOf(meal, lunch) {
     var hit = findClash(mealTags(meal), lunch);
     if (!hit) { return null; }
-    return { menu: hit, text: lunch.shortDate + ' 점심 ‘' + hit + '’과 겹침' };
+    return { menu: hit, text: lunch.shortDate + ' 점심·오후 간식 ‘' + hit + '’과 겹침' };
   }
 
   function kidClashOf(meal, lunch) {
     if (!meal || !meal.kidMenu) { return null; }
     var hit = findClash(mealTags(meal.kidMenu), lunch);
     if (!hit) { return null; }
-    return { menu: hit, text: '인성이 별도 메뉴 ‘' + hit + '’도 ' + lunch.shortDate + ' 점심과 겹침' };
+    return { menu: hit, text: '인성이 별도 메뉴 ‘' + hit + '’도 ' + lunch.shortDate + ' 점심·오후 간식과 겹침' };
   }
 
   /* ---------------- partial renders ---------------- */
@@ -485,9 +485,10 @@
     var items = Array.isArray(entry.items) ? entry.items : [];
     var rows = lunch.schedule.map(function (e) {
       var isTarget = e.date === entry.date;
+      var snackLine = e.afternoonSnack ? ' / 오후 간식 ' + e.afternoonSnack : '';
       return '<div class="menu-row' + (isTarget ? ' is-target' : '') + '">' +
         '<span class="menu-date">' + esc(monthDay(e.date, e.dayLabel)) + '</span>' +
-        '<span class="menu-items">' + esc((e.items || []).join(' · ')) + '</span>' +
+        '<span class="menu-items">' + esc((e.items || []).join(' · ') + snackLine) + '</span>' +
         '</div>';
     }).join('');
     return '' +
@@ -499,6 +500,7 @@
         '</div>' +
         '<p class="lunch-day">' + esc(lunch.dayText) + '</p>' +
         '<p class="lunch-today">' + esc(items.join(' · ')) + '</p>' +
+        (entry.afternoonSnack ? '<p class="lunch-after">🍪 오후 간식 ' + esc(entry.afternoonSnack) + '</p>' : '') +
         '<p class="lunch-note">' +
           (entry.snack ? '간식 ' + esc(entry.snack) + ' · ' : '') +
           '겹치는 메뉴는 ⚠️ 표시하고 아래로 내려뒀어요' +
@@ -1025,8 +1027,11 @@
           (entry.snack ? '<span class="slot-time">간식 ' + esc(entry.snack) + '</span>' : '') +
         '</div>' +
         '<p class="slot-title small">' + esc(items.join(' · ')) + '</p>' +
+        (entry.afternoonSnack
+          ? '<p class="slot-after">🍪 오후 간식 ' + esc(entry.afternoonSnack) + '</p>'
+          : '') +
         (avoid.length
-          ? '<p class="slot-memo school-avoid">이날 인성이 아침·저녁엔 ' + esc(avoid.join(' · ')) + ' 안 써요</p>'
+          ? '<p class="slot-memo school-avoid">이날 인성이 아침·저녁엔 점심·오후 간식에 나온 ' + esc(avoid.join(' · ')) + ' 안 써요</p>'
           : '') +
       '</div>';
   }
