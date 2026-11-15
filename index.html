@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#FFFDF7" />
+  <meta name="description" content="우리집 냉장고 · 냉장실과 냉동실 재료, 소비기한 임박, 지금 바로 되는 간단 식단" />
+  <title>우리집 냉장고 🧊</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧊</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="sky" aria-hidden="true">
+    <span class="blob blob-1"></span>
+    <span class="blob blob-2"></span>
+    <span class="blob blob-3"></span>
+  </div>
+
+  <main class="app" id="app">
+    <header class="hero">
+      <div class="hero-fridge" aria-hidden="true">
+        <svg viewBox="0 0 120 150" role="img" focusable="false">
+          <defs>
+            <linearGradient id="gDoor" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FFFFFF" />
+              <stop offset="100%" stop-color="#FFF8F0" />
+            </linearGradient>
+            <linearGradient id="gFreeze" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#F2F7FF" />
+              <stop offset="100%" stop-color="#DEE9FF" />
+            </linearGradient>
+            <linearGradient id="gCold" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#F0FCF9" />
+              <stop offset="100%" stop-color="#DBF5EF" />
+            </linearGradient>
+          </defs>
+          <ellipse cx="60" cy="142" rx="34" ry="5" fill="#E8DFD2" opacity="0.55" />
+          <rect x="14" y="10" width="92" height="126" rx="22" fill="url(#gDoor)" stroke="#EBE0D2" stroke-width="2.5" />
+          <path d="M14 34 a20 20 0 0 1 20-20 h52 a20 20 0 0 1 20 20 v26 a12 12 0 0 1 -12 12 h-68 a12 12 0 0 1 -12 -12 z" fill="url(#gFreeze)" />
+          <path d="M26 72 h68 a12 12 0 0 1 12 12 v34 a20 20 0 0 1 -20 18 h-52 a20 20 0 0 1 -20 -18 v-34 a12 12 0 0 1 12 -12 z" fill="url(#gCold)" />
+          <rect x="90" y="46" width="5" height="14" rx="2.5" fill="#C9D6F0" />
+          <rect x="90" y="92" width="5" height="22" rx="2.5" fill="#BFE6DF" />
+          <g fill="#4B4340">
+            <ellipse cx="46" cy="55" rx="4.2" ry="5" />
+            <ellipse cx="74" cy="55" rx="4.2" ry="5" />
+          </g>
+          <g fill="#FFFFFF">
+            <circle cx="47.5" cy="53" r="1.5" />
+            <circle cx="75.5" cy="53" r="1.5" />
+          </g>
+          <path d="M53 63 q7 6 14 0" stroke="#4B4340" stroke-width="2.6" fill="none" stroke-linecap="round" />
+          <ellipse cx="36" cy="64" rx="6" ry="3.6" fill="#FFC2C7" opacity="0.85" />
+          <ellipse cx="84" cy="64" rx="6" ry="3.6" fill="#FFC2C7" opacity="0.85" />
+          <g>
+            <rect x="28" y="92" width="26" height="24" rx="7" fill="#FFFDF3" stroke="#FFE1A8" stroke-width="2" transform="rotate(-6 41 104)" />
+            <text x="41" y="108" font-size="13" text-anchor="middle" transform="rotate(-6 41 104)">🍳</text>
+          </g>
+          <g>
+            <circle cx="73" cy="101" r="12" fill="#FFF0F1" stroke="#FFD2D6" stroke-width="2" />
+            <text x="73" y="106" font-size="12" text-anchor="middle">❤️</text>
+          </g>
+          <text x="59" y="130" font-size="12" text-anchor="middle">❄️</text>
+          <g fill="#BFD6FF">
+            <circle cx="8" cy="40" r="2.4" />
+            <circle cx="112" cy="34" r="2" />
+          </g>
+          <g fill="#A9E3D9">
+            <circle cx="112" cy="118" r="2.2" />
+            <circle cx="8" cy="112" r="1.8" />
+          </g>
+        </svg>
+      </div>
+
+      <h1>우리집 냉장고</h1>
+      <p class="hero-sub" id="heroSub">냉장실 · 냉동실 재료 한눈에</p>
+      <p class="updated" id="updated">🕐 마지막 업데이트 확인 중…</p>
+
+      <div class="pills" id="pills"></div>
+    </header>
+
+    <div id="sampleBanner"></div>
+
+    <nav class="tabs" id="tabs" aria-label="냉장고 메뉴"></nav>
+
+    <section class="toolbar" id="toolbar">
+      <label class="search">
+        <span class="search-icon" aria-hidden="true">🔍</span>
+        <input
+          type="search"
+          id="search"
+          inputmode="search"
+          autocomplete="off"
+          placeholder="재료 검색 (예: 우유, 만두)"
+          aria-label="재료 검색"
+        />
+        <button type="button" class="search-clear" id="searchClear" aria-label="검색어 지우기" hidden>✕</button>
+      </label>
+      <div class="chips" id="chips" role="group" aria-label="카테고리 필터"></div>
+    </section>
+
+    <div id="content" class="content" aria-live="polite"></div>
+
+    <footer class="footer">
+      <p>🧊 냉장고 문은 언제나 열려 있어요</p>
+      <p class="footer-fine">보기 전용 · 재료는 캡처로 자동 업데이트</p>
+    </footer>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
