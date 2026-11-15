@@ -947,6 +947,205 @@
     oxToast('↺ 이번 주 체크를 모두 지웠어요');
   }
 
+  /* ---------------- 🧂 집 조미료·부재료 체크 ---------------- */
+  /* 체크는 이 폰의 localStorage에만 저장하고 data.json은 건드리지 않아요.
+     data.json의 checked는 '처음 값'으로만 쓰고, 냉장·냉동 재고 숫자에는 넣지 않아요. */
+
+  var PANTRY_KEY = 'insung_fridge_pantry_v1';
+  var pantryStore = null;
+  var pantryFolded = false;
+
+  function pantryData() {
+    var p = state.data && state.data.pantry;
+    if (!p || !Array.isArray(p.groups)) { return null; }
+    return p;
+  }
+
+  function loadPantry() {
+    var m = {};
+    try {
+      var raw = window.localStorage.getItem(PANTRY_KEY);
+      var parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) { m = parsed; }
+    } catch (e) {
+      m = {};
+    }
+    pantryStore = m;
+    return m;
+  }
+
+  function pantryMap() {
+    if (!pantryStore) { loadPantry(); }
+    return pantryStore || {};
+  }
+
+  function savePantry() {
+    try {
+      window.localStorage.setItem(PANTRY_KEY, JSON.stringify(pantryMap()));
+    } catch (e) {
+      /* 저장이 막힌 브라우저에서는 이번 화면에서만 반영돼요 */
+    }
+  }
+
+  function pantryHas(name) {
+    return Object.prototype.hasOwnProperty.call(pantryMap(), name);
+  }
+
+  function pantryDefault(name) {
+    var p = pantryData();
+    if (!p) { return false; }
+    for (var i = 0; i < p.groups.length; i++) {
+      var items = p.groups[i].items || [];
+      for (var j = 0; j < items.length; j++) {
+        if (items[j].name === name) { return !!items[j].checked; }
+      }
+    }
+    return false;
+  }
+
+  function pantryOn(item) {
+    if (!item) { return false; }
+    if (pantryHas(item.name)) { return !!pantryMap()[item.name]; }
+    return !!item.checked;
+  }
+
+  function pantryNames() {
+    var p = pantryData();
+    var names = [];
+    if (!p) { return names; }
+    p.groups.forEach(function (g) {
+      (g.items || []).forEach(function (it) { if (it && it.name) { names.push(it.name); } });
+    });
+    return names;
+  }
+
+  function pantryCounts() {
+    var p = pantryData();
+    var out = { on: 0, total: 0 };
+    if (!p) { return out; }
+    p.groups.forEach(function (g) {
+      (g.items || []).forEach(function (it) { out.total++; if (pantryOn(it)) { out.on++; } });
+    });
+    return out;
+  }
+
+  function pantryChip(it) {
+    var on = pantryOn(it);
+    return '' +
+      '<button type="button" class="pantry-item' + (on ? ' on' : '') + '"' +
+        ' data-pantry="' + esc(it.name) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+        '<span class="pi-box" aria-hidden="true">' + (on ? '☑️' : '⬜') + '</span>' +
+        '<span class="pi-name">' + esc(it.name) + '</span>' +
+      '</button>';
+  }
+
+  function pantrySection() {
+    var p = pantryData();
+    if (!p) { return ''; }
+    var c = pantryCounts();
+    var groups = p.groups.map(function (g) {
+      return '' +
+        '<p class="pantry-group">' + esc((g.emoji ? g.emoji + ' ' : '') + (g.label || '')) + '</p>' +
+        '<div class="pantry-grid">' + (g.items || []).map(pantryChip).join('') + '</div>';
+    }).join('');
+    return '' +
+      '<section class="section pantry-sec' + (pantryFolded ? ' is-folded' : '') + '" id="pantrySec">' +
+        '<div class="sec-head">' +
+          '<h2 class="sec-title">' + esc(p.title || '🧂 집 조미료·부재료 체크하기') + '</h2>' +
+          '<span class="sec-count" id="pantryCount">' + c.on + '/' + c.total + '</span>' +
+          '<button type="button" class="pantry-fold" id="pantryFold" aria-expanded="' +
+            (pantryFolded ? 'false' : 'true') + '">' + (pantryFolded ? '펼치기 ▾' : '접기 ▴') + '</button>' +
+        '</div>' +
+        '<p class="sec-sub">' + esc(p.note || '') + '</p>' +
+        '<div class="pantry-body">' +
+          '<div class="pantry-tools">' +
+            '<button type="button" class="pantry-tool" data-pantry-all="1">☑️ 전체 선택</button>' +
+            '<button type="button" class="pantry-tool" data-pantry-reset="1">↺ 처음 값으로</button>' +
+          '</div>' +
+          groups +
+          '<button type="button" class="pantry-copy" id="pantryCopy">📋 체크한 조미료 복사해서 피클에 보내기</button>' +
+        '</div>' +
+      '</section>';
+  }
+
+  /* 카드만 다시 그려요 (스크롤·접힘 상태를 건드리지 않게) */
+  function refreshPantry() {
+    var holder = document.getElementById('pantrySec');
+    if (!holder || !holder.parentNode) { return; }
+    var tmp = document.createElement('div');
+    tmp.innerHTML = pantrySection();
+    var fresh = tmp.firstChild;
+    if (!fresh) { return; }
+    holder.parentNode.replaceChild(fresh, holder);
+  }
+
+  function pantryCopyText() {
+    var p = pantryData();
+    if (!p) { return ''; }
+    var on = [], off = [];
+    p.groups.forEach(function (g) {
+      (g.items || []).forEach(function (it) {
+        if (!it || !it.name) { return; }
+        (pantryOn(it) ? on : off).push(it.name);
+      });
+    });
+    return [
+      '[인성이네 냉장고 조미료 체크]',
+      '✅ 있는 것 (' + on.length + '개): ' + (on.join(' · ') || '없음'),
+      '⬜ 없는 것 (' + off.length + '개): ' + (off.join(' · ') || '없음'),
+      '→ 냉장고 조미료 목록에 반영해 줘!'
+    ].join('\n');
+  }
+
+  function copyPantry() {
+    var text = pantryCopyText();
+    if (!text) { return; }
+    copyText(text, function (ok) {
+      var btn = document.getElementById('pantryCopy');
+      if (btn) {
+        btn.textContent = ok ? '✅ 복사됐어요! 톡에 붙여넣기' : '복사가 안 됐어요 · 다시 눌러 주세요';
+        btn.classList.toggle('is-done', ok);
+        window.setTimeout(function () {
+          var again = document.getElementById('pantryCopy');
+          if (again) {
+            again.textContent = '📋 체크한 조미료 복사해서 피클에 보내기';
+            again.classList.remove('is-done');
+          }
+        }, 2000);
+      }
+      if (!ok) { oxToast('복사가 막혔어요 · 브라우저 설정을 확인해 주세요'); }
+    });
+  }
+
+  function togglePantry(name) {
+    if (!name) { return; }
+    var m = pantryMap();
+    var now = pantryHas(name) ? !!m[name] : pantryDefault(name);
+    m[name] = !now;
+    savePantry();
+    refreshPantry();
+  }
+
+  function pantrySelectAll() {
+    var m = pantryMap();
+    pantryNames().forEach(function (n) { m[n] = true; });
+    savePantry();
+    refreshPantry();
+    oxToast('☑️ 전부 체크했어요 · 없는 것만 눌러서 끄면 돼요');
+  }
+
+  function pantryReset() {
+    pantryStore = {};
+    savePantry();
+    refreshPantry();
+    oxToast('↺ 처음 값으로 되돌렸어요');
+  }
+
+  function togglePantryFold() {
+    pantryFolded = !pantryFolded;
+    refreshPantry();
+  }
+
   function weekSlot(kind, label, meal, entry, check, sv, w) {
     var incoming = (sv && sv.incoming && sv.incoming.meal) ? sv.incoming.meal : null;
     if (!meal && !incoming) { return ''; }
@@ -1364,6 +1563,7 @@
         c.innerHTML = emptyAll();
         return;
       }
+      if (!searching) { parts.push(pantrySection()); }
       if (!searching) { parts.push(weekTeaser()); }
       if (!searching) { parts.push(mealsSection(2)); }
       else if (mealCount > 0) { parts.push(mealsSection(2)); }
@@ -1425,6 +1625,12 @@
       }
       if (e.target.closest('#oxCopy')) { copyWeek(); return; }
       if (e.target.closest('#oxReset')) { resetWeek(); return; }
+      var pItem = e.target.closest('[data-pantry]');
+      if (pItem) { togglePantry(pItem.getAttribute('data-pantry')); return; }
+      if (e.target.closest('[data-pantry-all]')) { pantrySelectAll(); return; }
+      if (e.target.closest('[data-pantry-reset]')) { pantryReset(); return; }
+      if (e.target.closest('#pantryCopy')) { copyPantry(); return; }
+      if (e.target.closest('#pantryFold')) { togglePantryFold(); return; }
       var dayBtn = e.target.closest('[data-day]');
       if (dayBtn) {
         var jump = el('dayJump');
