@@ -1,6 +1,6 @@
 {
   "isSample": false,
-  "updatedAt": "2026-11-15T22:43:00+09:00",
+  "updatedAt": "2026-11-15T22:53:00+09:00",
   "fridge": [
     {
       "name": "[일미어담] 고등어구이 200g",
@@ -1892,7 +1892,7 @@
             "돼지",
             "카레"
           ],
-          "memo": "점심이 베이컨크림스파게티라 저녁은 카레로 (파스타·크림·햄·샐러드·사과 안 써요)"
+          "memo": "점심이 베이컨크림스파게티라 저녁은 카레로 (파스타·크림·햄·샐러드·사과 안 써요) · 카레가루 없으면 버터·소금·후추로 야채 볶아 곁들이기"
         },
         "dayMemo": "인성이 아침·저녁 금지: 파스타/크림 · 베이컨/햄 · 샐러드 · 과일/사과 · 쌀과자 (라이즈 점심·오후 간식 몫)"
       },
@@ -2087,7 +2087,7 @@
           },
           {
             "name": "쯔유/맛간장",
-            "checked": false
+            "checked": true
           }
         ]
       },
@@ -2097,39 +2097,39 @@
         "items": [
           {
             "name": "굴소스",
-            "checked": false
+            "checked": true
           },
           {
             "name": "참기름",
-            "checked": false
+            "checked": true
           },
           {
             "name": "들기름",
-            "checked": false
+            "checked": true
           },
           {
             "name": "식용유/올리브유",
-            "checked": false
+            "checked": true
           },
           {
             "name": "식초",
-            "checked": false
+            "checked": true
           },
           {
             "name": "맛술(미림)",
-            "checked": false
+            "checked": true
           },
           {
             "name": "케첩",
-            "checked": false
+            "checked": true
           },
           {
             "name": "마요네즈",
-            "checked": false
+            "checked": true
           },
           {
             "name": "돈가스소스",
-            "checked": false
+            "checked": true
           }
         ]
       },
@@ -2143,19 +2143,19 @@
           },
           {
             "name": "소금",
-            "checked": false
+            "checked": true
           },
           {
             "name": "설탕",
-            "checked": false
+            "checked": true
           },
           {
             "name": "올리고당/물엿",
-            "checked": false
+            "checked": true
           },
           {
             "name": "후추",
-            "checked": false
+            "checked": true
           },
           {
             "name": "카레가루",
@@ -2163,7 +2163,7 @@
           },
           {
             "name": "부침/튀김가루",
-            "checked": false
+            "checked": true
           }
         ]
       },
@@ -2177,7 +2177,7 @@
           },
           {
             "name": "코인육수/다시팩",
-            "checked": false
+            "checked": true
           },
           {
             "name": "파스타면",
@@ -2193,15 +2193,15 @@
           },
           {
             "name": "양파",
-            "checked": false
+            "checked": true
           },
           {
             "name": "계란",
-            "checked": false
+            "checked": true
           },
           {
             "name": "김",
-            "checked": false
+            "checked": true
           }
         ]
       }
