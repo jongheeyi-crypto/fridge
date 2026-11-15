@@ -1410,7 +1410,23 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .pantry-sec .sec-sub { margin: -2px 0 8px; color: #B3A387; }
-.pantry-room-title { margin: 14px 0 0; font-size: 11px; font-weight: 800; color: #A08966; }
+.pantry-room-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 0;
+  font-size: 11px;
+  font-weight: 800;
+  color: #A08966;
+}
+.pantry-room-count {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #F3EAD9;
+  color: #9C8358;
+  font-size: 9.5px;
+  font-weight: 800;
+}
 .pantry-room-empty {
   margin: 12px 0 0;
   padding: 9px 10px;
@@ -1468,7 +1484,18 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .pantry-item .pi-box { flex: 0 0 auto; font-size: 12.5px; line-height: 1; }
-.pantry-item .pi-name { flex: 1 1 auto; word-break: keep-all; }
+.pantry-item .pi-name { flex: 1 1 auto; min-width: 0; word-break: keep-all; }
+.pantry-item .pi-qty {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #F4F0E7;
+  color: #9C9280;
+  font-size: 9.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.pantry-item.on .pi-qty { background: #D8F2E3; color: #2C9B71; }
 .pantry-item.on { border-color: #9CDCB6; background: #EAF9F0; color: #22835A; }
 .pantry-item:active { transform: scale(0.98); }
 .pantry-copy {

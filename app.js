@@ -205,6 +205,12 @@
     var list = allItems().map(function (x) {
       return { key: norm(x.item.name), arriving: x.item.arriving || null };
     });
+    /* 찬장 실온 식품(pantry.roomTemp)도 '지금 집에 있는 재료'로 봐요.
+       이게 없으면 마녀스프·장조림처럼 방금 실온으로 정리한 재료가
+       식단 카드에서 🛒(없음)으로 잘못 떠요. 냉장·냉동 재고 숫자에는 넣지 않습니다. */
+    eachPantryItem(pantryRoomGroups(), function (it) {
+      list.push({ key: norm(it.name), arriving: null });
+    });
     return { list: list };
   }
 
@@ -968,7 +974,8 @@
     return (p && Array.isArray(p.groups)) ? p.groups : [];
   }
 
-  /* 찬장 실온 식품 그룹 — data.json의 pantry.roomTemp[] (groups와 같은 형식) */
+  /* 찬장 실온 식품 그룹 — data.json의 pantry.roomTemp[]
+     그룹: { label, items: [{ name, qty?, memo?, checked }] } */
   function pantryRoomGroups() {
     var p = pantryData();
     return (p && Array.isArray(p.roomTemp)) ? p.roomTemp : [];
@@ -1042,16 +1049,19 @@
   function pantryCounts() { return pantryGroupCounts(pantryGroups()); }
   function pantryRoomCounts() { return pantryGroupCounts(pantryRoomGroups()); }
 
-  /* 접힌 상태에서 한 줄로 보여주는 요약: 보유 조미료 31종 · 없는 것 1종(쌈장) · 실온 식품 추가 대기 */
+  /* 접힌 상태에서 한 줄로 보여주는 요약:
+     보유 조미료 37종 · 실온 식품 16종 · 없는 것 1종(쌈장) */
   function pantrySummaryText() {
     var c = pantryCounts();
     var missing = [];
     eachPantryItem(pantryGroups(), function (it) { if (!pantryOn(it)) { missing.push(it.name); } });
     var room = pantryRoomCounts();
     var bits = ['보유 조미료 ' + c.on + '종'];
+    if (room.total) {
+      bits.push('실온 식품 ' + (room.on === room.total ? room.on : room.on + '/' + room.total) + '종');
+    }
     bits.push('없는 것 ' + missing.length + '종' +
       (missing.length ? '(' + missing.slice(0, 2).join('·') + (missing.length > 2 ? ' 외' : '') + ')' : ''));
-    bits.push(room.total ? '실온 식품 ' + room.on + '/' + room.total + '종' : '실온 식품 추가 대기');
     return bits.join(' · ');
   }
 
@@ -1062,6 +1072,7 @@
         ' data-pantry="' + esc(it.name) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
         '<span class="pi-box" aria-hidden="true">' + (on ? '☑️' : '⬜') + '</span>' +
         '<span class="pi-name">' + esc(it.name) + '</span>' +
+        (it.qty ? '<span class="pi-qty">' + esc(it.qty) + '</span>' : '') +
       '</button>';
   }
 
@@ -1076,8 +1087,11 @@
     if (!p) { return ''; }
     var c = pantryCounts();
     var room = pantryRoomGroups();
+    var roomCount = pantryRoomCounts();
     var roomBody = room.length
-      ? '<p class="pantry-room-title">🏠 찬장 실온 식품</p>' +
+      ? '<p class="pantry-room-title">🏠 찬장 실온 식품' +
+          '<span class="pantry-room-count">' + roomCount.on + '/' + roomCount.total + '</span>' +
+        '</p>' +
         room.map(pantryGroupBlock).join('')
       : '<p class="pantry-room-empty">🏠 찬장 실온 식품은 아직 없어요 · 실온 식품 캡처를 보내주시면 이 섹션에 같이 담아둘게요</p>';
     return '' +
