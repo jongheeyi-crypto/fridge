@@ -1,6 +1,6 @@
 {
   "isSample": false,
-  "updatedAt": "2026-11-15T23:40:00+09:00",
+  "updatedAt": "2026-11-16T08:50:00+09:00",
   "fridge": [
     {
       "name": "[일미어담] 고등어구이 200g",
@@ -24,7 +24,7 @@
       "qty": "2개",
       "category": "유제품·빵",
       "expiryDate": null,
-      "memo": "기존 1개 + 11/16(월) 아침 도착 1개"
+      "memo": "기존 1개 + 11/16 컬리 도착 완료 1개"
     },
     {
       "name": "감홍 사과 1.3kg (4~6입)",
@@ -48,7 +48,6 @@
       "qty": "1개 (3팩)",
       "category": "반찬·소스",
       "expiryDate": null,
-      "arriving": "2026-11-16",
       "memo": "두부·어묵 넣기 좋아요"
     },
     {
@@ -57,7 +56,6 @@
       "qty": "1개 (2컵)",
       "category": "반찬·소스",
       "expiryDate": null,
-      "arriving": "2026-11-16",
       "memo": "찌개·부침용"
     },
     {
@@ -66,7 +64,6 @@
       "qty": "1개",
       "category": "생선·고기",
       "expiryDate": null,
-      "arriving": "2026-11-16",
       "memo": "식빵 토스트용"
     },
     {
@@ -75,7 +72,6 @@
       "qty": "1개 (497g)",
       "category": "밀키트",
       "expiryDate": null,
-      "arriving": "2026-11-16",
       "memo": "팬 6분 조리 (냉장)"
     },
     {
@@ -84,7 +80,6 @@
       "qty": "200g · 40g × 5 소분",
       "category": "생선·고기",
       "expiryDate": null,
-      "arriving": "2026-11-16",
       "memo": "40g씩 5회분 소분 · 인성이 아침 단백질용 (초반 냉장, 후반 냉동)"
     },
     {
@@ -93,7 +88,6 @@
       "qty": "1개",
       "category": "채소·과일",
       "expiryDate": null,
-      "arriving": "2026-11-16",
       "memo": "바로 먹는 샐러드"
     },
     {
@@ -102,7 +96,6 @@
       "qty": "1개",
       "category": "채소·과일",
       "expiryDate": null,
-      "arriving": "2026-11-16",
       "memo": "오리엔탈 소스 포함"
     },
     {
@@ -462,7 +455,6 @@
       "qty": "1개",
       "category": "생선·고기",
       "expiryDate": null,
-      "arriving": "2026-11-16",
       "memo": "냉동 보관 · 볶음·탕용"
     },
     {
@@ -471,7 +463,6 @@
       "qty": "2개",
       "category": "아이 맞춤",
       "expiryDate": null,
-      "arriving": "2026-11-16",
       "memo": "어묵국·떡볶이용 (냉동)"
     }
   ],
