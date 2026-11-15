@@ -158,6 +158,7 @@ body {
 .pill.frozen { color: var(--freeze-deep); background: #F7FAFF; border-color: var(--freeze-line); }
 .pill.soon { color: #E05A5A; background: var(--urgent-bg); border-color: #FFDCD5; }
 .pill.coming { color: #6D5CA8; background: #F7F3FF; border-color: #E4DAFA; }
+.pill.clear { color: #B9601A; background: #FFF4E8; border-color: #FFDCC0; }
 
 /* ---------- sample banner ---------- */
 #sampleBanner { margin-top: 10px; }
@@ -477,6 +478,27 @@ body {
   text-overflow: ellipsis;
 }
 
+/* 기존 보유 · 우선 소진 (냉장고 파먹기 1순위) */
+.item-card.is-priority {
+  border-color: #FFE3CB;
+  background: linear-gradient(180deg, #FFFDF8 0%, #FFF7EE 100%);
+}
+.card-priority {
+  margin: 7px 0 0;
+  padding: 3px 5px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #FFF3E6 0%, #FFE7D8 100%);
+  border: 1px solid #FFD6B5;
+  color: #B9601A;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* D-day pill */
 .dday {
   flex: 0 0 auto;
@@ -657,6 +679,33 @@ body {
 .meal + .meal { margin-top: 9px; }
 .meal-group + .meal-group { margin-top: 18px; }
 .meal.is-clash { border-style: dashed; opacity: 0.78; }
+.meal.is-priority {
+  border-color: #FFD9B4;
+  box-shadow: 0 6px 18px rgba(235, 172, 100, 0.18);
+}
+.meal-priority {
+  display: inline-block;
+  margin-right: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #FFEEDA 0%, #FFE1C6 100%);
+  border: 1px solid #FFD0A6;
+  color: #B9601A;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+.home-clear {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 2px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #B9601A;
+  line-height: 1.5;
+}
 .meal-clash {
   display: inline-block;
   padding: 2px 8px;

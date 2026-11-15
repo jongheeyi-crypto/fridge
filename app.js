@@ -162,12 +162,25 @@
     return itemsOf(storage).filter(function (i) {
       return matchesQuery(i) && matchesCat(i);
     }).sort(function (a, b) {
+      /* 냉장고 파먹기 1순위(기존 보유 · 우선 소진)를 맨 앞으로, 도착 예정 재료보다 먼저 */
+      var pa = isPriority(a) ? 0 : 1;
+      var pb = isPriority(b) ? 0 : 1;
+      if (pa !== pb) { return pa - pb; }
       var da = daysLeft(a), db = daysLeft(b);
       if (da === null && db === null) { return 0; }
       if (da === null) { return 1; }
       if (db === null) { return -1; }
       return da - db;
     });
+  }
+
+  /* 기존에 있던 재료 중 먼저 비워야 하는 것 (냉장고 파먹기 1순위) */
+  function isPriority(x) {
+    return !!x && (x.priority === 1 || x.clearFirst === true);
+  }
+
+  function priorityCount() {
+    return allItems().filter(function (x) { return isPriority(x.item); }).length;
   }
 
   function urgentCount() {
@@ -316,13 +329,16 @@
     var qty = item.qty ? '<span class="qty">' + esc(item.qty) + '</span>' : '';
     var cat = item.category ? '<span class="tag">' + esc(item.category) + '</span>' : '';
     var memo = item.memo ? '<p class="card-memo">' + esc(item.memo) + '</p>' : '';
+    var prio = isPriority(item) ? '<p class="card-priority">🔥 우선 소진</p>' : '';
     return '' +
       '<article class="item-card ' + (storage === 'freezer' ? 'is-frozen' : 'is-cold') +
+        (isPriority(item) ? ' is-priority' : '') +
         (arrivingPill(item) ? ' is-arriving' : '') + '">' +
         '<div class="card-top">' +
           '<span class="card-emoji" aria-hidden="true">' + esc(item.emoji || '🍽') + '</span>' +
           storageBadge(item, storage) +
         '</div>' +
+        prio +
         arrivingPill(item) +
         '<h3 class="card-name">' + esc(item.name) + '</h3>' +
         '<div class="card-meta">' + qty + cat + '</div>' +
@@ -335,6 +351,7 @@
     if (hideEmpty && list.length === 0) { return ''; }
     var isFridge = storage === 'fridge';
     var title = isFridge ? '❄️ 냉장실' : '🧊 냉동실';
+    var prio = list.filter(isPriority).length;
     var body;
     if (list.length === 0) {
       body = '<div class="empty"><span class="big">' + (isFridge ? '🧺' : '🥶') + '</span>' +
@@ -350,6 +367,7 @@
           '<h2 class="sec-title">' + title + '</h2>' +
           '<span class="sec-count">' + list.length + '개</span>' +
         '</div>' +
+        (prio ? '<p class="sec-sub">🔥 우선 소진 ' + prio + '개를 맨 앞에 뒀어요</p>' : '') +
         '<div class="panel' + (isFridge ? '' : ' frozen') + '">' + body + '</div>' +
       '</section>';
   }
@@ -380,6 +398,7 @@
     var adult = clashOf(meal, lunch);
     var kid = kidClashOf(meal, lunch);
     var marks = '';
+    if (isPriority(meal)) { marks += '<span class="meal-priority">🔥 냉장고 파먹기 1순위</span>'; }
     if (lunch && lunch.active) {
       if (adult) { marks += '<span class="meal-clash">⚠️ ' + esc(adult.text) + '</span>'; }
       if (kid) { marks += '<span class="meal-clash">⚠️ ' + esc(kid.text) + '</span>'; }
@@ -395,7 +414,9 @@
         '</div>';
     }
     return '' +
-      '<article class="meal meal-' + course + (adult || kid ? ' is-clash' : '') + '">' +
+      '<article class="meal meal-' + course +
+        (isPriority(meal) ? ' is-priority' : '') +
+        (adult || kid ? ' is-clash' : '') + '">' +
         '<div class="meal-top">' +
           '<div class="meal-emoji" aria-hidden="true">' + esc(meal.emoji || '🍳') + '</div>' +
           '<div class="meal-head">' +
@@ -427,17 +448,21 @@
     }
     var stock = inStock();
     var lunch = targetLunch();
-    list.sort(function (a, b) {
-      var ca = (clashOf(a, lunch) ? 1 : 0) + (kidClashOf(a, lunch) ? 1 : 0);
-      var cb = (clashOf(b, lunch) ? 1 : 0) + (kidClashOf(b, lunch) ? 1 : 0);
-      if (ca !== cb) { return ca - cb; }
-      var sa = stockScore(a, stock);
-      var sb = stockScore(b, stock);
-      if (sb !== sa) { return sb - sa; }
-      var order = { breakfast: 0, dinner: 1, salad: 2 };
-      return order[courseOf(a)] - order[courseOf(b)];
+    var ranked = list.map(function (m) {
+      var clash = (clashOf(m, lunch) ? 1 : 0) + (kidClashOf(m, lunch) ? 1 : 0);
+      return { meal: m, clash: clash, clear: isPriority(m) ? 1 : 0, score: stockScore(m, stock) };
     });
-    return list;
+    var order = { breakfast: 0, dinner: 1, salad: 2 };
+    ranked.sort(function (a, b) {
+      /* 1순위: 점심과 안 겹치는 ‘냉장고 파먹기’ 식단 → 그다음 안 겹치는 식단 → 겹치는 식단 */
+      var ga = a.clash === 0 ? (a.clear ? 0 : 1) : 2;
+      var gb = b.clash === 0 ? (b.clear ? 0 : 1) : 2;
+      if (ga !== gb) { return ga - gb; }
+      if (a.clash !== b.clash) { return a.clash - b.clash; }
+      if (b.score !== a.score) { return b.score - a.score; }
+      return order[courseOf(a.meal)] - order[courseOf(b.meal)];
+    });
+    return ranked.map(function (r) { return r.meal; });
   }
 
   function lunchBanner(lunch) {
@@ -561,6 +586,7 @@
             '<button type="button" class="sec-more" data-goto="meals">전체 보기 ›</button>' +
           '</div>' +
           homeLunchLine(lunch) +
+          (priorityCount() ? '<p class="home-clear">🔥 냉장고 파먹기 1순위 · 냉동실에 있던 재료부터 씨요</p>' : '') +
           blocks +
         '</section>';
     }
@@ -572,7 +598,7 @@
           '<h2 class="sec-title">🍳 간단 식단</h2>' +
           '<span class="sec-count">' + list.length + '개</span>' +
         '</div>' +
-        '<p class="sec-sub">아침은 인성이 전용, 저녁은 세 가족 기준이에요 · 라이즈 점심과 겹치지 않는 메뉴부터 보여드려요</p>' +
+        '<p class="sec-sub">아침은 인성이 전용, 저녁은 세 가족 기준이에요 · 🔥 냉장고 파먹기 1순위 → 라이즈 점심과 안 겹치는 메뉴 순서예요</p>' +
         courseSection('breakfast', breakfasts, stock, lunch) +
         courseSection('dinner', dinners, stock, lunch) +
         courseSection('salad', salads, stock, lunch) +
@@ -628,12 +654,14 @@
     var frozen = itemsOf('freezer').length;
     var soon = urgentCount();
     var coming = arrivingCount();
+    var clearing = priorityCount();
 
     el('heroSub').textContent = '냉장실 재료와 냉동실 재료를 한 번에 볼 수 있어요';
     el('pills').innerHTML = '' +
       '<span class="pill cold">❄️ 냉장 <b>' + cold + '</b></span>' +
       '<span class="pill frozen">🧊 냉동 <b>' + frozen + '</b></span>' +
       (coming ? '<span class="pill coming">📦 도착 예정 <b>' + coming + '</b></span>' : '') +
+      (clearing ? '<span class="pill clear">🔥 우선 소진 <b>' + clearing + '</b></span>' : '') +
       '<span class="pill soon">⏰ 임박 <b>' + soon + '</b></span>';
 
     var banner = el('sampleBanner');
