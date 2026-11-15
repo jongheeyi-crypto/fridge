@@ -3,7 +3,7 @@
   'use strict';
 
   var TZ = 'Asia/Seoul';
-  var CATEGORIES = ['전체', '밀키트', '생선·고기', '유제품·빵', '채소·과일', '아이 맞춤'];
+  var CATEGORIES = ['전체', '밀키트', '생선·고기', '유제품·빵', '채소·과일', '반찬·소스', '아이 맞춤'];
   var TABS = [
     { id: 'all', emoji: '🏠', label: '전체 보기' },
     { id: 'fridge', emoji: '❄️', label: '냉장실' },
@@ -32,6 +32,8 @@
 
   /* ---------------- dates ---------------- */
 
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
   function todayParts() {
     var parts = new Intl.DateTimeFormat('en-CA', {
       timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit'
@@ -48,6 +50,11 @@
     return Date.UTC(t.y, t.m - 1, t.d);
   }
 
+  function isoToday() {
+    var t = todayParts();
+    return t.y + '-' + pad2(t.m) + '-' + pad2(t.d);
+  }
+
   function parseYMD(s) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
     if (!m) { return null; }
@@ -60,10 +67,22 @@
     return Math.round((t - todayUTC()) / 86400000);
   }
 
+  function daysUntil(iso) {
+    var t = parseYMD(iso);
+    if (t === null) { return null; }
+    return Math.round((t - todayUTC()) / 86400000);
+  }
+
   function expiryLabel(s) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
     if (!m) { return ''; }
     return Number(m[1]) + '년 ' + Number(m[2]) + '월 ' + Number(m[3]) + '일';
+  }
+
+  function monthDay(iso, dayLabel) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+    if (!m) { return ''; }
+    return Number(m[2]) + '/' + Number(m[3]) + (dayLabel ? '(' + dayLabel + ')' : '');
   }
 
   function formatUpdated(iso) {
@@ -79,7 +98,7 @@
     }
   }
 
-  /* ---------------- storage badge / D-day ---------------- */
+  /* ---------------- 보관 배지 / D-day / 도착 예정 ---------------- */
   /* expiryDate가 없으면 날짜를 지어내지 않고 보관 위치만 알려줘요. */
 
   function storageBadge(item, storage) {
@@ -96,6 +115,18 @@
     else { cls = 'fresh'; label = 'D-' + n; }
     var title = expiryLabel(item.expiryDate) + '까지';
     return '<span class="dday ' + cls + '" title="' + esc(title) + '">' + label + '</span>';
+  }
+
+  /* 주문 도착 예정 — 도착일이 지나면 자동으로 사라져요. */
+  function arrivingPill(item) {
+    var n = daysUntil(item && item.arriving);
+    if (n === null || n < 0) { return ''; }
+    var label;
+    if (n === 0) { label = '📦 오늘 도착'; }
+    else if (n === 1) { label = '📦 내일 도착'; }
+    else { label = '📦 ' + monthDay(item.arriving) + ' 도착'; }
+    var full = monthDay(item.arriving) + ' 도착 예정';
+    return '<p class="card-arriving" title="' + esc(full) + '">' + label + '</p>';
   }
 
   /* ---------------- data helpers ---------------- */
@@ -140,54 +171,125 @@
     }).length;
   }
 
+  function arrivingCount() {
+    return allItems().filter(function (x) {
+      var n = daysUntil(x.item.arriving);
+      return n !== null && n >= 0;
+    }).length;
+  }
+
   /* 재료 이름과 식단의 uses 표기를 느슨하게 맞춥니다.
      (예: "우유 식빵" ↔ "클래식 우유 식빵 420g") */
   function inStock() {
-    var names = allItems().map(function (x) { return norm(x.item.name); });
-    return { names: names, exact: names.reduce(function (a, n) { a[n] = true; return a; }, {}) };
+    var list = allItems().map(function (x) {
+      return { key: norm(x.item.name), arriving: x.item.arriving || null };
+    });
+    return { list: list };
   }
 
-  function hasStock(label, stock) {
+  /* ok: 지금 냉장고에 있음 · soon: 내일(예정일) 도착 · need: 없음 */
+  function stockState(label, stock) {
     var k = norm(label);
-    if (!k) { return false; }
-    if (stock.exact[k]) { return true; }
-    for (var i = 0; i < stock.names.length; i++) {
-      var n = stock.names[i];
-      if (n.indexOf(k) !== -1 || k.indexOf(n) !== -1) { return true; }
+    if (!k) { return 'need'; }
+    var hit = null, i;
+    for (i = 0; i < stock.list.length; i++) {
+      if (stock.list[i].key === k) { hit = stock.list[i]; break; }
     }
-    return false;
+    if (!hit) {
+      for (i = 0; i < stock.list.length; i++) {
+        var n = stock.list[i].key;
+        if (n.indexOf(k) !== -1 || k.indexOf(n) !== -1) { hit = stock.list[i]; break; }
+      }
+    }
+    if (!hit) { return 'need'; }
+    var d = daysUntil(hit.arriving);
+    if (d !== null && d >= 0) { return 'soon'; }
+    return 'ok';
   }
 
-  /* ---------------- 점심 식단표 연동 (미리 자리만 만들어 둔 구조) ---------------- */
+  function stockScore(meal, stock) {
+    return (meal.uses || []).reduce(function (a, u) {
+      var s = stockState(u, stock);
+      return a + (s === 'ok' ? 2 : s === 'soon' ? 1 : 0);
+    }, 0);
+  }
 
-  function lunchInfo() {
+  /* ---------------- 인성이 점심 식단표 ---------------- */
+
+  function lunchData() {
     var lm = state.data && state.data.lunchMenu;
-    if (!lm || typeof lm !== 'object') { return null; }
-    var today = typeof lm.todayLunch === 'string' ? lm.todayLunch.trim() : '';
+    if (!lm || typeof lm !== 'object' || !Array.isArray(lm.schedule)) { return null; }
+    return lm;
+  }
+
+  /* 오늘이 식단표에 있으면 오늘, 없으면 가장 가까운 다음 급식일. */
+  function targetLunch() {
+    var lm = lunchData();
+    if (!lm) { return null; }
+    var today = isoToday();
+    var entry = null, next = null;
+    lm.schedule.forEach(function (e) {
+      if (!e || !parseYMD(e.date)) { return; }
+      if (e.date === today) { entry = e; }
+      else if (e.date > today && (!next || e.date < next.date)) { next = e; }
+    });
+    var isToday = !!entry;
+    if (!entry) { entry = next; }
+    if (!entry) { return { active: false, schoolName: lm.schoolName, note: lm.note, schedule: lm.schedule }; }
+    if (!lm.active) { return { active: false, schoolName: lm.schoolName, note: lm.note, schedule: lm.schedule }; }
+
+    var diff = daysUntil(entry.date);
+    var md = monthDay(entry.date, entry.dayLabel);            // 11/16(월)
+    var human = md.replace('(', ' ').replace(')', '');        // 11/16 월
+    var label;
+    if (isToday) { label = '오늘 유치원 점심'; }
+    else if (diff === 1) { label = '내일(' + human + ') 유치원 점심'; }
+    else { label = md + ' 유치원 점심'; }
+
     return {
-      active: !!lm.active && !!today,
-      note: lm.note || '인성이 점심 식단표 보내주시면 겹치지 않게 아침·저녁을 맞춰 추천해요!',
-      today: today
+      active: true,
+      entry: entry,
+      diff: diff,
+      label: label,
+      isToday: isToday,
+      shortDate: md,
+      schoolName: lm.schoolName,
+      note: lm.note,
+      schedule: lm.schedule
     };
   }
 
-  function mealTokens(meal) {
+  function mealTags(meal) {
     var out = [];
-    ['keywords', 'avoidTags'].forEach(function (key) {
-      var arr = Array.isArray(meal[key]) ? meal[key] : [];
-      arr.forEach(function (t) {
-        var n = norm(t);
-        if (n && out.indexOf(n) === -1) { out.push(n); }
-      });
+    (Array.isArray(meal.avoidTags) ? meal.avoidTags : []).forEach(function (t) {
+      var n = norm(t);
+      if (n && out.indexOf(n) === -1) { out.push(n); }
     });
     return out;
   }
 
-  function overlapsLunch(meal, lunch) {
-    if (!lunch || !lunch.active) { return false; }
-    var text = norm(lunch.today);
-    if (!text) { return false; }
-    return mealTokens(meal).some(function (t) { return text.indexOf(t) !== -1; });
+  /* 점심과 겹치는 메뉴 이름을 찾아 '11/16(월) 점심 ‘어묵국’과 겹침' 형태로 돌려줘요. */
+  function clashOf(meal, lunch) {
+    if (!lunch || !lunch.active) { return null; }
+    var items = Array.isArray(lunch.entry.items) ? lunch.entry.items : [];
+    var avoid = Array.isArray(lunch.entry.avoidTags) ? lunch.entry.avoidTags : [];
+    var tags = mealTags(meal);
+    var hit = null, i, j;
+
+    for (i = 0; i < tags.length && !hit; i++) {
+      for (j = 0; j < items.length; j++) {
+        if (norm(items[j]).indexOf(tags[i]) !== -1) { hit = items[j]; break; }
+      }
+    }
+    if (!hit) {
+      for (i = 0; i < tags.length && !hit; i++) {
+        for (j = 0; j < avoid.length; j++) {
+          if (norm(avoid[j]) === tags[i]) { hit = avoid[j]; break; }
+        }
+      }
+    }
+    if (!hit) { return null; }
+    return { menu: hit, text: lunch.shortDate + ' 점심 ‘' + hit + '’과 겹침' };
   }
 
   /* ---------------- partial renders ---------------- */
@@ -197,11 +299,13 @@
     var cat = item.category ? '<span class="tag">' + esc(item.category) + '</span>' : '';
     var memo = item.memo ? '<p class="card-memo">' + esc(item.memo) + '</p>' : '';
     return '' +
-      '<article class="item-card ' + (storage === 'freezer' ? 'is-frozen' : 'is-cold') + '">' +
+      '<article class="item-card ' + (storage === 'freezer' ? 'is-frozen' : 'is-cold') +
+        (arrivingPill(item) ? ' is-arriving' : '') + '">' +
         '<div class="card-top">' +
           '<span class="card-emoji" aria-hidden="true">' + esc(item.emoji || '🍽') + '</span>' +
           storageBadge(item, storage) +
         '</div>' +
+        arrivingPill(item) +
         '<h3 class="card-name">' + esc(item.name) + '</h3>' +
         '<div class="card-meta">' + qty + cat + '</div>' +
         memo +
@@ -235,9 +339,9 @@
   function mealCard(meal, stock, lunch) {
     var uses = Array.isArray(meal.uses) ? meal.uses : [];
     var ings = uses.map(function (u) {
-      var has = hasStock(u, stock);
-      return '<span class="ing ' + (has ? 'ok' : 'need') + '">' +
-        (has ? '✅ ' : '🛒 ') + esc(u) + '</span>';
+      var st = stockState(u, stock);
+      return '<span class="ing ' + st + '">' +
+        (st === 'ok' ? '✅ ' : st === 'soon' ? '📦 ' : '🛒 ') + esc(u) + '</span>';
     }).join('');
     var steps = (Array.isArray(meal.steps) ? meal.steps : []).map(function (s, idx) {
       return '<li><span class="n">' + (idx + 1) + '</span><span>' + esc(s) + '</span></li>';
@@ -248,8 +352,11 @@
           (isDinner ? '🌙 저녁 추천' : '🌅 아침 추천') + '</span>'
       : '';
     var who = meal.who ? '<span class="meal-who">' + esc(meal.who) + '</span>' : '';
-    var clash = overlapsLunch(meal, lunch)
-      ? '<span class="meal-clash">⚠️ 점심과 겹침</span>'
+    var clash = clashOf(meal, lunch);
+    var mark = lunch && lunch.active
+      ? (clash
+          ? '<span class="meal-clash">⚠️ ' + esc(clash.text) + '</span>'
+          : '<span class="meal-away">✨ 점심과 안 겹쳐요</span>')
       : '';
     return '' +
       '<article class="meal' + (clash ? ' is-clash' : '') + '">' +
@@ -264,7 +371,7 @@
             '</div>' +
           '</div>' +
         '</div>' +
-        clash +
+        (mark ? '<div class="meal-mark">' + mark + '</div>' : '') +
         (ings ? '<div class="ings">' + ings + '</div>' : '') +
         (steps ? '<ol class="steps">' + steps + '</ol>' : '') +
       '</article>';
@@ -280,13 +387,13 @@
       });
     }
     var stock = inStock();
-    var lunch = lunchInfo();
+    var lunch = targetLunch();
     list.sort(function (a, b) {
-      var ca = overlapsLunch(a, lunch) ? 1 : 0;
-      var cb = overlapsLunch(b, lunch) ? 1 : 0;
+      var ca = clashOf(a, lunch) ? 1 : 0;
+      var cb = clashOf(b, lunch) ? 1 : 0;
       if (ca !== cb) { return ca - cb; }
-      var sa = (a.uses || []).filter(function (u) { return hasStock(u, stock); }).length;
-      var sb = (b.uses || []).filter(function (u) { return hasStock(u, stock); }).length;
+      var sa = stockScore(a, stock);
+      var sb = stockScore(b, stock);
       if (sb !== sa) { return sb - sa; }
       var ta = a.mealTime === '아침' ? 0 : 1;
       var tb = b.mealTime === '아침' ? 0 : 1;
@@ -295,30 +402,56 @@
     return list;
   }
 
-  function lunchBanner() {
-    var lm = lunchInfo();
-    if (!lm) { return ''; }
-    if (lm.active) {
+  function lunchBanner(lunch) {
+    if (!lunch) { return ''; }
+    if (!lunch.active) {
       return '' +
-        '<div class="lunch-banner on">' +
+        '<div class="lunch-banner">' +
           '<div class="lunch-top">' +
             '<span class="lunch-emoji" aria-hidden="true">🍱</span>' +
-            '<span class="lunch-title">인성이 점심 식단 연동됨</span>' +
-            '<span class="lunch-state">자동 회피 중</span>' +
+            '<span class="lunch-title">인성이 점심 식단 연동</span>' +
+            '<span class="lunch-state">대기 중</span>' +
           '</div>' +
-          '<p class="lunch-today">오늘 점심 · ' + esc(lm.today) + '</p>' +
-          '<p class="lunch-note">점심과 겹치는 메뉴는 ⚠️ 표시하고 아래로 내려뒀어요.</p>' +
+          '<p class="lunch-note">' + esc(lunch.note || '인성이 점심 식단표 보내주시면 겹치지 않게 아침·저녁을 맞춰 추천해요!') + '</p>' +
         '</div>';
     }
+    var entry = lunch.entry;
+    var items = Array.isArray(entry.items) ? entry.items : [];
+    var rows = lunch.schedule.map(function (e) {
+      var isTarget = e.date === entry.date;
+      return '<div class="menu-row' + (isTarget ? ' is-target' : '') + '">' +
+        '<span class="menu-date">' + esc(monthDay(e.date, e.dayLabel)) + '</span>' +
+        '<span class="menu-items">' + esc((e.items || []).join(' · ')) + '</span>' +
+        '</div>';
+    }).join('');
     return '' +
-      '<div class="lunch-banner">' +
+      '<div class="lunch-banner on">' +
         '<div class="lunch-top">' +
           '<span class="lunch-emoji" aria-hidden="true">🍱</span>' +
-          '<span class="lunch-title">인성이 점심 식단 연동</span>' +
-          '<span class="lunch-state">대기 중</span>' +
+          '<span class="lunch-title">' + esc(lunch.label) + '</span>' +
+          '<span class="lunch-state">연동됨</span>' +
         '</div>' +
-        '<p class="lunch-note">' + esc(lm.note) + '</p>' +
+        '<p class="lunch-today">' + esc(items.join(' · ')) + '</p>' +
+        '<p class="lunch-note">' +
+          (entry.snack ? '간식 ' + esc(entry.snack) + ' · ' : '') +
+          '겹치는 메뉴는 ⚠️ 표시하고 아래로 내려뒀어요' +
+        '</p>' +
+        '<details class="menu-more">' +
+          '<summary>' + esc((lunch.schoolName || '11월 식단') + ' 전체 보기') + ' · ' + lunch.schedule.length + '일</summary>' +
+          '<div class="menu-list">' + rows + '</div>' +
+        '</details>' +
       '</div>';
+  }
+
+  function homeLunchLine(lunch) {
+    if (!lunch || !lunch.active) {
+      return '<p class="home-lunch off">🍱 점심 식단표를 보내주시면 겹치지 않게 맞춰드려요</p>';
+    }
+    var items = Array.isArray(lunch.entry.items) ? lunch.entry.items : [];
+    var head = items.slice(0, 3).join(' · ');
+    var rest = items.length > 3 ? ' 외 ' + (items.length - 3) : '';
+    return '<p class="home-lunch">🍱 ' + esc(lunch.label.replace(' 유치원 점심', '')) + ' 점심 · ' +
+      esc(head + rest) + '<span>겹치지 않는 메뉴 먼저</span></p>';
   }
 
   function mealGroup(time, list, stock, lunch) {
@@ -335,21 +468,23 @@
   }
 
   function mealsSection(limit) {
-    var lunch = lunchInfo();
+    var lunch = targetLunch();
     var stock = inStock();
     var isAll = state.tab === 'all';
     var list = mealsFor();
     if (list.length === 0) {
       if (isAll) { return ''; }
-      return '<section class="section">' + lunchBanner() +
+      return '<section class="section">' + lunchBanner(lunch) +
         '<div class="empty"><span class="big">🍳</span>' +
         '지금은 추천할 식단이 없어요<br>재료가 들어오면 바로 채워드릴게요</div></section>';
     }
 
     if (isAll) {
-      /* 홈 하이라이트: 아침 하나 + 저녁 하나 */
-      var morning = list.filter(function (m) { return m.mealTime === '아침'; })[0];
-      var dinner = list.filter(function (m) { return m.mealTime === '저녁'; })[0];
+      /* 홈 하이라이트: 점심과 안 겹치는 아침 하나 + 저녁 하나 */
+      var morning = list.filter(function (m) { return m.mealTime === '아침' && !clashOf(m, lunch); })[0] ||
+        list.filter(function (m) { return m.mealTime === '아침'; })[0];
+      var dinner = list.filter(function (m) { return m.mealTime === '저녁' && !clashOf(m, lunch); })[0] ||
+        list.filter(function (m) { return m.mealTime === '저녁'; })[0];
       var picks = [morning, dinner].filter(Boolean);
       if (picks.length === 0) { picks = list.slice(0, 2); }
       return '' +
@@ -359,7 +494,7 @@
             '<span class="sec-count">' + picks.length + '개</span>' +
             '<button type="button" class="sec-more" data-goto="meals">전체 보기 ›</button>' +
           '</div>' +
-          '<p class="sec-sub">냉장고에 있는 재료로 바로 되는 메뉴만 골랐어요</p>' +
+          homeLunchLine(lunch) +
           picks.map(function (m) { return mealCard(m, stock, lunch); }).join('') +
         '</section>';
     }
@@ -369,12 +504,12 @@
     var body = mealGroup('아침', mornings, stock, lunch) + mealGroup('저녁', dinners, stock, lunch);
     return '' +
       '<section class="section">' +
-        lunchBanner() +
+        lunchBanner(lunch) +
         '<div class="sec-head">' +
           '<h2 class="sec-title">🍳 간단 식단</h2>' +
           '<span class="sec-count">' + list.length + '개</span>' +
         '</div>' +
-        '<p class="sec-sub">아침·저녁으로 나눠서, 지금 있는 재료로 바로 되는 메뉴예요</p>' +
+        '<p class="sec-sub">아침·저녁으로 나눠서, 유치원 점심과 겹치지 않는 메뉴부터 보여드려요</p>' +
         body +
       '</section>';
   }
@@ -427,11 +562,13 @@
     var cold = itemsOf('fridge').length;
     var frozen = itemsOf('freezer').length;
     var soon = urgentCount();
+    var coming = arrivingCount();
 
     el('heroSub').textContent = '냉장실 재료와 냉동실 재료를 한 번에 볼 수 있어요';
     el('pills').innerHTML = '' +
       '<span class="pill cold">❄️ 냉장 <b>' + cold + '</b></span>' +
       '<span class="pill frozen">🧊 냉동 <b>' + frozen + '</b></span>' +
+      (coming ? '<span class="pill coming">📦 도착 예정 <b>' + coming + '</b></span>' : '') +
       '<span class="pill soon">⏰ 임박 <b>' + soon + '</b></span>';
 
     var banner = el('sampleBanner');

@@ -157,6 +157,7 @@ body {
 .pill.cold { color: var(--fridge-deep); background: #F4FCFA; border-color: var(--fridge-line); }
 .pill.frozen { color: var(--freeze-deep); background: #F7FAFF; border-color: var(--freeze-line); }
 .pill.soon { color: #E05A5A; background: var(--urgent-bg); border-color: #FFDCD5; }
+.pill.coming { color: #6D5CA8; background: #F7F3FF; border-color: #E4DAFA; }
 
 /* ---------- sample banner ---------- */
 #sampleBanner { margin-top: 10px; }
@@ -459,6 +460,23 @@ body {
   overflow: hidden;
 }
 
+/* 도착 예정(주문) */
+.card-arriving {
+  margin: 7px 0 0;
+  padding: 3px 5px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #F4EFFF 0%, #EDF5FF 100%);
+  border: 1px solid #E2D9FA;
+  color: #6D5CA8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* D-day pill */
 .dday {
   flex: 0 0 auto;
@@ -516,8 +534,64 @@ body {
   white-space: nowrap;
 }
 .lunch-banner.on .lunch-state { background: #7C63C9; border-color: #7C63C9; color: #FFFFFF; }
-.lunch-today { margin: 7px 0 0; font-size: 12px; font-weight: 700; color: #5C4C86; }
+.lunch-today { margin: 7px 0 0; font-size: 11.5px; font-weight: 700; color: #5C4C86; line-height: 1.5; }
 .lunch-note { margin: 6px 0 0; font-size: 11.5px; line-height: 1.5; color: #8579A3; font-weight: 500; }
+
+.menu-more { margin-top: 8px; }
+.menu-more summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 4px 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7C63C9;
+  -webkit-tap-highlight-color: transparent;
+}
+.menu-more summary::-webkit-details-marker { display: none; }
+.menu-more summary::after { content: ' ▾'; font-size: 9px; }
+.menu-more[open] summary::after { content: ' ▴'; }
+.menu-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 6px;
+  max-height: 230px;
+  overflow-y: auto;
+}
+.menu-row {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #6F6590;
+  font-size: 10.5px;
+}
+.menu-row.is-target { background: #FFFFFF; border: 1px solid #D9C9F2; }
+.menu-date { font-weight: 800; color: #5C4C86; }
+.menu-items { font-weight: 500; line-height: 1.45; }
+
+.home-lunch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: -3px 2px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #6B5B8E;
+  line-height: 1.5;
+}
+.home-lunch span {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #F3EDFF;
+  border: 1px solid #E4DAFA;
+  color: #8B7BB0;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.home-lunch.off { color: #B3A79A; font-weight: 500; }
 
 /* ---------- meal cards ---------- */
 .meal {
@@ -532,7 +606,6 @@ body {
 .meal.is-clash { border-style: dashed; opacity: 0.78; }
 .meal-clash {
   display: inline-block;
-  margin-top: 8px;
   padding: 2px 8px;
   border-radius: 999px;
   background: #FFF4EC;
@@ -540,7 +613,20 @@ body {
   color: #C4694F;
   font-size: 10.5px;
   font-weight: 700;
+  line-height: 1.5;
 }
+.meal-away {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #EFFBF4;
+  border: 1px solid #C9EFDC;
+  color: #2E8F6A;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.meal-mark { margin-top: 9px; }
 
 .meal-top { display: flex; align-items: flex-start; gap: 10px; }
 .meal-emoji {
@@ -613,6 +699,7 @@ body {
   font-weight: 600;
 }
 .ing.ok { background: #F1FCF7; border-color: #CBEDDE; color: #2E8F6A; }
+.ing.soon { background: #F7F2FF; border-color: #E2D9FA; color: #6D5CA8; }
 .ing.need { background: #FFF4F0; border-color: #FFDCD1; color: #C4694F; }
 
 .steps {
