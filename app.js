@@ -1711,9 +1711,9 @@
         c.innerHTML = emptyAll();
         return;
       }
-      if (!searching) { parts.push(weekTeaser()); }
       if (!searching) { parts.push(mealsSection(2)); }
       else if (mealCount > 0) { parts.push(mealsSection(2)); }
+      if (!searching) { parts.push(weekTeaser()); }
       parts.push(itemsSection('fridge', true));
       parts.push(itemsSection('freezer', true));
       /* 🧺 실온·조미료 체크는 맨 아래로 내리고 기본은 접힌 컴팩트 요약 */
