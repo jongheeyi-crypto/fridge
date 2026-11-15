@@ -1158,7 +1158,7 @@
         '<div class="slot slot-' + kind + ' slot-skipped">' +
           '<div class="slot-head">' +
             '<span class="slot-label">' + label + '</span>' +
-            '<span class="skip-badge">⏭️ 외출 · 패스</span>' +
+            '<span class="skip-badge">' + esc(meal.who || '⏭️ 외출 · 패스') + '</span>' +
           '</div>' +
           '<p class="slot-title">' + (meal.emoji ? esc(meal.emoji) + ' ' : '') + esc(meal.title || '이 끼니는 안 먹어요') + '</p>' +
           (meal.memo ? '<p class="slot-memo">' + esc(meal.memo) + '</p>' : '') +
