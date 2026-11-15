@@ -179,31 +179,34 @@ body {
   position: sticky;
   top: 0;
   z-index: 20;
-  display: flex;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
   margin: 12px -14px 0;
   padding: 10px 14px;
-  overflow-x: auto;
   background: rgba(255, 253, 247, 0.93);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  scrollbar-width: none;
+  box-shadow: 0 8px 12px -12px rgba(140, 125, 110, 0.5);
 }
-.tabs::-webkit-scrollbar { display: none; }
 
 .tab {
-  flex: 0 0 auto;
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 8px 13px;
-  border-radius: 999px;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  padding: 6px 2px;
+  border-radius: 14px;
   border: 1.5px solid var(--line);
   background: #FFFFFF;
   color: var(--ink-soft);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 11.5px;
   font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
   cursor: pointer;
   transition: transform 0.14s ease, box-shadow 0.18s ease, background 0.18s ease, color 0.18s ease;
   -webkit-tap-highlight-color: transparent;
@@ -227,7 +230,7 @@ body {
   background: linear-gradient(135deg, #FFA9A9 0%, #FF8080 100%);
   box-shadow: 0 6px 14px rgba(255, 128, 128, 0.3);
 }
-.tab .tab-emoji { font-size: 13px; line-height: 1; }
+.tab .tab-emoji { font-size: 15px; line-height: 1; }
 
 /* ---------- toolbar ---------- */
 .toolbar { margin-top: 10px; }
@@ -272,24 +275,22 @@ body {
 
 .chips {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 5px;
   margin-top: 9px;
-  overflow-x: auto;
   padding-bottom: 2px;
-  scrollbar-width: none;
 }
-.chips::-webkit-scrollbar { display: none; }
 .chips[hidden] { display: none; }
 
 .chip {
   flex: 0 0 auto;
-  padding: 6px 11px;
+  padding: 5px 10px;
   border-radius: 999px;
   border: 1.5px solid var(--line);
   background: #FFFFFF;
   color: var(--ink-soft);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
