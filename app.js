@@ -600,9 +600,356 @@
       '</div>';
   }
 
-  function weekSlot(kind, label, meal, entry, check) {
-    if (!meal) { return ''; }
-    if (meal.skipped) {
+  /* ---------------- ⭕/❌ 체크 & 자동 미루기 ---------------- */
+  /* 웹에서 누른 체크는 이 폰의 localStorage에만 저장하고, 남편 폰·냉장고 재고는
+     '📋 피클에 보낼 내용 복사'로 옮겨요. data.json은 건드리지 않아요. */
+
+  var OX_KEY = 'insung_fridge_ox_v1';
+  var OX_COURSES = ['breakfast', 'lunch', 'dinner'];
+  var OX_LABEL = { breakfast: '아침', lunch: '점심', dinner: '저녁' };
+  var oxStore = null;
+
+  function oxSlotKey(date, course) { return date + '|' + course; }
+
+  function loadOX() {
+    var all = {};
+    try {
+      var raw = window.localStorage.getItem(OX_KEY);
+      var parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) { all = parsed; }
+    } catch (e) {
+      all = {};
+    }
+    oxStore = all;
+    return all;
+  }
+
+  function oxAll() {
+    if (!oxStore) { loadOX(); }
+    return oxStore || {};
+  }
+
+  /* 주간 식단은 startDate별로 따로 저장해요. */
+  function weekOX(w) {
+    var all = oxAll();
+    var key = (w && w.startDate) ? w.startDate : 'week';
+    if (!all[key] || typeof all[key] !== 'object' || Array.isArray(all[key])) { all[key] = {}; }
+    return all[key];
+  }
+
+  function saveOX() {
+    try {
+      window.localStorage.setItem(OX_KEY, JSON.stringify(oxAll()));
+    } catch (e) {
+      /* 저장이 막힌 브라우저에서는 이번 화면에서만 반영돼요 */
+    }
+  }
+
+  function setOX(date, course, value) {
+    var w = weekPlan();
+    if (!w || !date || OX_COURSES.indexOf(course) === -1) { return; }
+    var map = weekOX(w);
+    var k = oxSlotKey(date, course);
+    if (value === 'eaten' || value === 'passed') { map[k] = value; }
+    else { delete map[k]; }
+    saveOX();
+  }
+
+  function clearOX() {
+    var w = weekPlan();
+    if (!w) { return; }
+    var all = oxAll();
+    all[(w.startDate || 'week')] = {};
+    saveOX();
+  }
+
+  function oxCounts(w) {
+    var map = weekOX(w);
+    var out = { eaten: 0, passed: 0, total: 0 };
+    Object.keys(map).forEach(function (k) {
+      if (map[k] === 'eaten') { out.eaten++; }
+      else if (map[k] === 'passed') { out.passed++; }
+    });
+    out.total = out.eaten + out.passed;
+    return out;
+  }
+
+  function weekDayLabel(w, date) {
+    var days = (w && w.days) || [];
+    for (var i = 0; i < days.length; i++) {
+      if (days[i].date === date) { return days[i].dayLabel || ''; }
+    }
+    return '';
+  }
+
+  /* 11/17(화) 저녁 */
+  function slotStamp(w, date, course) {
+    return monthDay(date, weekDayLabel(w, date)) + ' ' + (OX_LABEL[course] || '');
+  }
+
+  function destText(w, spot) {
+    if (!spot) { return '뒤'; }
+    if (spot.next) { return '다음 주로'; }
+    return slotStamp(w, spot.date, spot.course) + '으로';
+  }
+
+  /* 미룰 끼니가 그날 라이즈 점심과 겹치는지 볼 때 쓰는 태그
+     (매운 저녁은 인성이 별도 메뉴 기준, 그 밖엔 메뉴 자체 기준) */
+  function deferTags(meal, course) {
+    if (course === 'dinner' && meal && meal.kidMenu) { return mealTags(meal.kidMenu); }
+    return mealTags(meal);
+  }
+
+  function entryClash(tags, entry) {
+    if (!entry || !tags || !tags.length) { return null; }
+    var probe = { active: true, entry: entry, shortDate: monthDay(entry.date, entry.dayLabel) };
+    return findClash(tags, probe);
+  }
+
+  /* ❌ 패스한 끼니를 같은 코스의 뒤 날짜로 순연(cascade) 배치한 결과를 계산해요.
+     - data.json에서 이미 패스한 끼니와 ⭕ 먹음은 자리를 지켜요.
+     - 미룰 메뉴는 그런 자리를 건너뛰고 다음 자리에 들어가며, 원래 그 자리에 있던 메뉴는
+       한 칸씩 뒤로 밀려요.
+     - 평일 아침·저녁이 그날 라이즈 점심과 겹치면 그날은 건너뛰고 다음 날로 보내요.
+     - 일요일 뒤로 밀려 남은 메뉴는 '다음 주로 미뤄진 메뉴'로 모아요. */
+  function computeWeekView(w) {
+    var map = weekOX(w);
+    var view = {};
+    var placedAt = {};
+    var nextWeek = [];
+
+    w.days.forEach(function (d) { view[d.date] = {}; });
+
+    OX_COURSES.forEach(function (course) {
+      var carry = [];
+
+      w.days.forEach(function (d) {
+        var orig = d[course];
+        var token = oxSlotKey(d.date, course);
+        var st = map[token] || null;
+        var sv = { date: d.date, course: course, state: st, incoming: null, movedTo: null, fixed: false };
+        view[d.date][course] = sv;
+
+        if (orig && orig.skipped) {
+          sv.fixed = true;
+          placedAt[token] = { here: true };
+          return;
+        }
+        if (orig && st === 'eaten') {
+          placedAt[token] = { here: true };
+          return;
+        }
+        if (orig && st === 'passed') {
+          carry.push({ meal: orig, from: d.date, course: course, token: token });
+          return;
+        }
+
+        if (carry.length) {
+          var head = carry[0];
+          var entry = schoolEntry(d.date);
+          var blocked = false;
+          if (entry && !d.weekend && (course === 'breakfast' || course === 'dinner')) {
+            if (entryClash(deferTags(head.meal, course), entry)) { blocked = true; }
+          }
+          if (!blocked) {
+            carry.shift();
+            sv.incoming = head;
+            placedAt[head.token] = { date: d.date, course: course };
+            if (orig) { carry.push({ meal: orig, from: d.date, course: course, token: token }); }
+            return;
+          }
+        }
+
+        if (orig) { placedAt[token] = { here: true }; }
+      });
+
+      carry.forEach(function (c) {
+        placedAt[c.token] = { next: true };
+        nextWeek.push(c);
+      });
+    });
+
+    w.days.forEach(function (d) {
+      OX_COURSES.forEach(function (course) {
+        var sv = view[d.date][course];
+        if (!sv || sv.fixed) { return; }
+        var spot = placedAt[oxSlotKey(d.date, course)];
+        sv.movedTo = (spot && !spot.here) ? spot : null;
+      });
+    });
+
+    return { view: view, nextWeek: nextWeek, counts: oxCounts(w) };
+  }
+
+  function oxButtons(date, course, state) {
+    var k = oxSlotKey(date, course);
+    var name = OX_LABEL[course] || '';
+    return '' +
+      '<div class="ox-row" role="group" aria-label="' + esc(name) + ' 체크">' +
+        '<button type="button" class="ox-btn eat' + (state === 'eaten' ? ' on' : '') +
+          '" data-ox="' + esc(k) + '" data-val="eaten" aria-pressed="' + (state === 'eaten' ? 'true' : 'false') +
+          '">⭕ 먹음</button>' +
+        '<button type="button" class="ox-btn pass' + (state === 'passed' ? ' on' : '') +
+          '" data-ox="' + esc(k) + '" data-val="passed" aria-pressed="' + (state === 'passed' ? 'true' : 'false') +
+          '">❌ 패스</button>' +
+      '</div>';
+  }
+
+  function oxBar(w, counts) {
+    var hint = '각 끼니의 ⭕/❌를 누르면 내 폰에서 바로 미뤄지고, 복사해서 피클에 보내면 남편 폰·재고도 같이 맞춰져요';
+    var live = '';
+    if (counts.total > 0) {
+      live = '' +
+        '<div class="ox-bar-live">' +
+          '<div class="ox-count">' +
+            '<b class="eat">⭕ 먹음 ' + counts.eaten + '</b>' +
+            '<b class="pass">❌ 미룸 ' + counts.passed + '</b>' +
+          '</div>' +
+          '<div class="ox-actions">' +
+            '<button type="button" class="ox-copy" id="oxCopy">📋 피클에 보낼 내용 복사</button>' +
+            '<button type="button" class="ox-reset" id="oxReset">↺ 초기화</button>' +
+          '</div>' +
+        '</div>';
+    }
+    return '' +
+      '<div class="ox-bar' + (counts.total > 0 ? ' is-live' : '') + '" id="oxBar">' +
+        '<p class="ox-hint">💡 ' + esc(hint) + '</p>' +
+        live +
+      '</div>';
+  }
+
+  function nextWeekCard(w, list) {
+    if (!list.length) { return ''; }
+    return '' +
+      '<div class="wnext" id="weekNext">' +
+        '<p class="wnext-title">📦 다음 주로 미뤄진 메뉴</p>' +
+        '<ul class="wnext-list">' +
+          list.map(function (c) {
+            var m = c.meal || {};
+            return '<li>' +
+              '<span class="wn-emoji" aria-hidden="true">' + esc(m.emoji || '🍽') + '</span>' +
+              '<span class="wn-body">' +
+                '<b>' + esc(m.title || '') + '</b>' +
+                '<span class="wn-from">← ' + esc(slotStamp(w, c.from, c.course)) + '에서</span>' +
+              '</span>' +
+            '</li>';
+          }).join('') +
+        '</ul>' +
+        '<p class="wnext-note">이번 주 안에 자리가 없어서 다음 주 식단으로 넘겨뒀어요 · 재료는 그대로 남아 있어요</p>' +
+      '</div>';
+  }
+
+  /* 피클에 붙여넣을 한국어 요약 */
+  function oxCopyText(w, model) {
+    var map = weekOX(w);
+    var rows = [];
+    w.days.forEach(function (d) {
+      OX_COURSES.forEach(function (course) {
+        var st = map[oxSlotKey(d.date, course)];
+        if (st !== 'eaten' && st !== 'passed') { return; }
+        var sv = model.view[d.date][course];
+        var meal = (sv && sv.original) ? sv.original : (d[course] || {});
+        rows.push({
+          date: d.date,
+          course: course,
+          st: st,
+          title: meal.title || '',
+          stamp: slotStamp(w, d.date, course),
+          dest: (sv && sv.movedTo) ? destText(w, sv.movedTo) : ''
+        });
+      });
+    });
+    rows.sort(function (a, b) {
+      if (a.date !== b.date) { return a.date < b.date ? -1 : 1; }
+      return OX_COURSES.indexOf(a.course) - OX_COURSES.indexOf(b.course);
+    });
+
+    var lines = ['[인성이네 냉장고 식단 체크]'];
+    rows.forEach(function (r) {
+      var line = '- ' + r.stamp + ': ' + (r.st === 'eaten' ? '⭕ 먹음' : '❌ 패스·미룸');
+      if (r.title) { line += ' (' + r.title + ')'; }
+      if (r.st === 'passed' && r.dest) { line += ' → ' + r.dest; }
+      lines.push(line);
+    });
+    lines.push('→ 확인 후 남편 화면이랑 냉장고 재고에도 반영해 줘!');
+    return lines.join('\n');
+  }
+
+  function copyText(text, done) {
+    var fallback = function () {
+      var ok = false;
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        ta.style.left = '-1000px';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, text.length);
+        ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch (e) {
+        ok = false;
+      }
+      done(ok);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  function oxToast(text) {
+    var old = document.getElementById('oxToast');
+    if (old && old.parentNode) { old.parentNode.removeChild(old); }
+    var box = document.createElement('div');
+    box.className = 'ox-toast';
+    box.id = 'oxToast';
+    box.setAttribute('role', 'status');
+    box.textContent = text;
+    document.body.appendChild(box);
+    window.setTimeout(function () {
+      if (box && box.parentNode) { box.parentNode.removeChild(box); }
+    }, 1900);
+  }
+
+  function copyWeek() {
+    var w = weekPlan();
+    if (!w) { return; }
+    var text = oxCopyText(w, computeWeekView(w));
+    copyText(text, function (ok) {
+      var btn = document.getElementById('oxCopy');
+      if (btn) {
+        btn.textContent = ok ? '✅ 복사됐어요! 톡에 붙여넣기' : '복사가 안 됐어요 · 다시 눌러 주세요';
+        btn.classList.toggle('is-done', ok);
+        window.setTimeout(function () {
+          var again = document.getElementById('oxCopy');
+          if (again) {
+            again.textContent = '📋 피클에 보낼 내용 복사';
+            again.classList.remove('is-done');
+          }
+        }, 2000);
+      }
+      if (!ok) { oxToast('복사가 막혔어요 · 브라우저 설정을 확인해 주세요'); }
+    });
+  }
+
+  function resetWeek() {
+    clearOX();
+    renderContent();
+    oxToast('↺ 이번 주 체크를 모두 지웠어요');
+  }
+
+  function weekSlot(kind, label, meal, entry, check, sv, w) {
+    var incoming = (sv && sv.incoming && sv.incoming.meal) ? sv.incoming.meal : null;
+    if (!meal && !incoming) { return ''; }
+    var isOX = OX_COURSES.indexOf(kind) !== -1;
+    var state = (sv && isOX && meal) ? sv.state : null;
+
+    if (meal && meal.skipped) {
       /* 외출·패스한 끼: 흐리게 표시하고 겹침 검증·재료 칩은 건너뛰어요. */
       return '' +
         '<div class="slot slot-' + kind + ' slot-skipped">' +
@@ -614,29 +961,54 @@
           (meal.memo ? '<p class="slot-memo">' + esc(meal.memo) + '</p>' : '') +
         '</div>';
     }
-    var clash = (check && entry) ? clashWithEntry(meal, entry) : null;
-    var kidClash = (check && entry && meal.kidMenu) ? clashWithEntry(meal.kidMenu, entry) : null;
-    var chips = weekChips(meal.uses);
+
+    if (state === 'passed') {
+      var movedTo = (sv && sv.movedTo) ? sv.movedTo : null;
+      return '' +
+        '<div class="slot slot-' + kind + ' slot-passed">' +
+          '<div class="slot-head">' +
+            '<span class="slot-label">' + label + '</span>' +
+            '<span class="pass-badge">⏭️ 패스 · 뒤로 미룸</span>' +
+          '</div>' +
+          '<p class="slot-title">' + (meal.emoji ? esc(meal.emoji) + ' ' : '') + esc(meal.title || '') + '</p>' +
+          '<p class="slot-move">↪ ' + esc(destText(w, movedTo)) + ' 미뤘어요</p>' +
+          (isOX ? oxButtons(sv.date, kind, 'passed') : '') +
+        '</div>';
+    }
+
+    var shown = (sv && sv.incoming && sv.incoming.meal) ? sv.incoming.meal : meal;
+    var fromDate = (sv && sv.incoming) ? sv.incoming.from : null;
+    var clash = (check && entry) ? clashWithEntry(shown, entry) : null;
+    var kidClash = (check && entry && shown.kidMenu) ? clashWithEntry(shown.kidMenu, entry) : null;
+    var chips = weekChips(shown.uses);
     var mark = '';
     if (check && entry) {
       mark = (clash || kidClash)
         ? '<span class="wmark warn">⚠️ ' + esc(clash || kidClash) + ' 겹침</span>'
         : '<span class="wmark ok">✅ 라이즈 점심과 안 겹쳐요</span>';
     }
-    var who = (meal.who && kind !== 'lunch' && kind !== 'snack')
-      ? '<span class="slot-who">' + esc(meal.who) + '</span>' : '';
+    var who = (shown.who && kind !== 'lunch' && kind !== 'snack')
+      ? '<span class="slot-who">' + esc(shown.who) + '</span>' : '';
+    var movedIn = fromDate
+      ? '<div class="moved-row"><span class="moved-badge">↪️ ' + esc(slotStamp(w, fromDate, kind)) + '에서 미룸</span></div>'
+      : '';
     return '' +
-      '<div class="slot slot-' + kind + '">' +
+      '<div class="slot slot-' + kind +
+        (state === 'eaten' ? ' slot-eaten' : '') +
+        (fromDate ? ' slot-moved' : '') + '">' +
         '<div class="slot-head">' +
           '<span class="slot-label">' + label + '</span>' +
           who +
-          (meal.time ? '<span class="slot-time">⏱ ' + esc(meal.time) + '</span>' : '') +
+          (shown.time ? '<span class="slot-time">⏱ ' + esc(shown.time) + '</span>' : '') +
         '</div>' +
-        '<p class="slot-title">' + (meal.emoji ? esc(meal.emoji) + ' ' : '') + esc(meal.title || '') + '</p>' +
+        '<p class="slot-title">' + (shown.emoji ? esc(shown.emoji) + ' ' : '') + esc(shown.title || '') + '</p>' +
+        movedIn +
+        (state === 'eaten' ? '<p class="ox-eaten">⭕ 먹었어요</p>' : '') +
         (chips ? '<div class="ings">' + chips + '</div>' : '') +
         (mark ? '<div class="wmark-row">' + mark + '</div>' : '') +
-        (meal.memo ? '<p class="slot-memo">' + esc(meal.memo) + '</p>' : '') +
-        weekKidBox(meal.kidMenu, entry) +
+        (shown.memo ? '<p class="slot-memo">' + esc(shown.memo) + '</p>' : '') +
+        weekKidBox(shown.kidMenu, entry) +
+        (isOX ? oxButtons(sv ? sv.date : '', kind, state) : '') +
       '</div>';
   }
 
@@ -657,11 +1029,12 @@
       '</div>';
   }
 
-  function weekDayCard(day) {
+  function weekDayCard(day, w, model) {
     if (!day || !parseYMD(day.date)) { return ''; }
     var entry = schoolEntry(day.date);
     var n = daysUntil(day.date);
     var cls = 'day-card' + (n === 0 ? ' is-today' : '') + (n !== null && n < 0 ? ' is-past' : '');
+    var v = (model && model.view[day.date]) || {};
     var out = [];
     out.push('<article class="' + cls + '" id="day-' + esc(day.date) + '">');
     out.push('<div class="day-head">' +
@@ -670,11 +1043,11 @@
       dayBadge(day.date) +
       '<span class="day-flag">' + (entry ? '평일 · 유치원 점심 연동' : '주말 · 3가족') + '</span>' +
       '</div>');
-    out.push(weekSlot('breakfast', '🌅 인성이 아침', day.breakfast, entry, true));
-    out.push(weekSlot('lunch', day.weekend ? '🍱 주말 점심' : '🥗 엄마 점심', day.lunch, entry, false));
+    out.push(weekSlot('breakfast', '🌅 인성이 아침', day.breakfast, entry, true, v.breakfast, w));
+    out.push(weekSlot('lunch', day.weekend ? '🍱 주말 점심' : '🥗 엄마 점심', day.lunch, entry, false, v.lunch, w));
     out.push(schoolSlot(entry));
-    out.push(weekSlot('dinner', '🌙 세 가족 저녁', day.dinner, entry, true));
-    out.push(weekSlot('snack', '🍪 간식·곁들임', day.snack, entry, false));
+    out.push(weekSlot('dinner', '🌙 세 가족 저녁', day.dinner, entry, true, v.dinner, w));
+    out.push(weekSlot('snack', '🍪 간식·곁들임', day.snack, entry, false, v.snack, w));
     if (day.dayMemo) { out.push('<p class="day-memo">📝 ' + esc(day.dayMemo) + '</p>'); }
     out.push('</article>');
     return out.join('');
@@ -727,6 +1100,7 @@
         '아직 주간 식단표가 없어요</div></section>';
     }
     var s = weekStats(w);
+    var model = computeWeekView(w);
     var head = '' +
       '<div class="week-hero">' +
         '<p class="week-kicker">🍽 7일 냉장고 파먹기</p>' +
@@ -761,10 +1135,10 @@
         '</div>';
     }
 
-    return '<section class="section week-page">' + head + jump +
-      w.days.map(weekDayCard).join('') + leftover + '</section>';
+    return '<section class="section week-page">' + head + jump + oxBar(w, model.counts) +
+      w.days.map(function (d) { return weekDayCard(d, w, model); }).join('') +
+      nextWeekCard(w, model.nextWeek) + leftover + '</section>';
   }
-
   function courseSection(course, list, stock, lunch) {
     if (list.length === 0) { return ''; }
     var meta = COURSE_META[course];
@@ -1020,6 +1394,28 @@
     });
 
     el('content').addEventListener('click', function (e) {
+      var oxBtn = e.target.closest('[data-ox]');
+      if (oxBtn) {
+        var oxRaw = oxBtn.getAttribute('data-ox') || '';
+        var oxParts = oxRaw.split('|');
+        var oxVal = oxBtn.getAttribute('data-val');
+        var oxNow = weekOX(weekPlan())[oxRaw] || null;
+        var card = oxBtn.closest('.day-card');
+        var topBefore = card ? card.getBoundingClientRect().top : null;
+        setOX(oxParts[0], oxParts[1], oxNow === oxVal ? null : oxVal);
+        renderContent();
+        /* 누른 날짜 카드가 화면에서 같은 자리에 있도록 스크롤을 맞춰요 */
+        if (card && topBefore !== null) {
+          var same = document.getElementById(card.id);
+          if (same) {
+            var delta = same.getBoundingClientRect().top - topBefore;
+            if (Math.abs(delta) > 1) { window.scrollBy(0, delta); }
+          }
+        }
+        return;
+      }
+      if (e.target.closest('#oxCopy')) { copyWeek(); return; }
+      if (e.target.closest('#oxReset')) { resetWeek(); return; }
       var dayBtn = e.target.closest('[data-day]');
       if (dayBtn) {
         var jump = el('dayJump');
