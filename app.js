@@ -496,6 +496,21 @@
   function courseSection(course, list, stock, lunch) {
     if (list.length === 0) { return ''; }
     var meta = COURSE_META[course];
+    var body = '';
+    if (course === 'dinner') {
+      var mild = list.filter(function (m) { return !m.kidMenu; });
+      var spicy = list.filter(function (m) { return !!m.kidMenu; });
+      if (mild.length) {
+        body += '<p class="sub-group">👨‍👩‍👦 3가족 함께 먹는 날</p>' +
+          mild.map(function (m) { return mealCard(m, stock, lunch); }).join('');
+      }
+      if (spicy.length) {
+        body += '<p class="sub-group spicy">🌶️ 어른 매운메뉴 + 👶 인성이 별도</p>' +
+          spicy.map(function (m) { return mealCard(m, stock, lunch); }).join('');
+      }
+    } else {
+      body = list.map(function (m) { return mealCard(m, stock, lunch); }).join('');
+    }
     return '' +
       '<div class="meal-group">' +
         '<div class="sec-head">' +
@@ -503,7 +518,7 @@
           '<span class="sec-count">' + list.length + '개</span>' +
         '</div>' +
         '<p class="sec-sub course-sub">' + meta.sub + '</p>' +
-        list.map(function (m) { return mealCard(m, stock, lunch); }).join('') +
+        body +
       '</div>';
   }
 

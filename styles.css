@@ -606,6 +606,14 @@ body {
 .pick-label + .meal { margin-top: 0; }
 .meal + .pick-label { margin-top: 14px; }
 .course-sub { margin-top: -4px; }
+.sub-group {
+  margin: 4px 2px 7px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #8B7A62;
+  letter-spacing: -0.2px;
+}
+.sub-group.spicy { margin-top: 16px; color: #C4694F; }
 
 /* 매운 저녁에 붙는 인성이 별도 메뉴 */
 .kid-menu {
