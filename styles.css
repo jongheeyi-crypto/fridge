@@ -534,7 +534,8 @@ body {
   white-space: nowrap;
 }
 .lunch-banner.on .lunch-state { background: #7C63C9; border-color: #7C63C9; color: #FFFFFF; }
-.lunch-today { margin: 7px 0 0; font-size: 11.5px; font-weight: 700; color: #5C4C86; line-height: 1.5; }
+.lunch-today { margin: 5px 0 0; font-size: 11.5px; font-weight: 700; color: #5C4C86; line-height: 1.5; }
+.lunch-day { margin: 8px 0 0; font-size: 12px; font-weight: 800; color: #4B3D73; letter-spacing: -0.2px; }
 .lunch-note { margin: 6px 0 0; font-size: 11.5px; line-height: 1.5; color: #8579A3; font-weight: 500; }
 
 .menu-more { margin-top: 8px; }
@@ -592,6 +593,50 @@ body {
   white-space: nowrap;
 }
 .home-lunch.off { color: #B3A79A; font-weight: 500; }
+
+/* 아침 인성이 / 저녁 세 가족 구분 */
+.pick-label {
+  margin: 0 2px 7px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #8B7A62;
+  letter-spacing: -0.2px;
+}
+.pick-label + .meal + .pick-label,
+.pick-label + .meal { margin-top: 0; }
+.meal + .pick-label { margin-top: 14px; }
+.course-sub { margin-top: -4px; }
+
+/* 매운 저녁에 붙는 인성이 별도 메뉴 */
+.kid-menu {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  background: #FFF8F0;
+  border: 1.5px dashed #FFD9AE;
+}
+.kid-label {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #B4762C;
+  letter-spacing: -0.2px;
+}
+.kid-title {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: #7A5A2E;
+}
+.kid-menu .ings { margin-top: 6px; }
+.meal-memo {
+  margin: 8px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #A2875A;
+}
 
 /* ---------- meal cards ---------- */
 .meal {
@@ -674,6 +719,7 @@ body {
 }
 .meal-when.morning { background: #FFF3DC; border: 1px solid #FFE0AE; color: #B9791F; }
 .meal-when.evening { background: #EDF0FF; border: 1px solid #DAE0FF; color: #5566C4; }
+.meal-when.salad { background: #EFFBF5; border: 1px solid #CBEFE0; color: #2E8F6A; }
 .meal-who {
   padding: 2px 8px;
   border-radius: 999px;

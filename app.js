@@ -12,6 +12,12 @@
     { id: 'shop', emoji: '🛒', label: '장보기' }
   ];
 
+  var COURSE_META = {
+    breakfast: { title: '🌅 아침 식단 (인성이 전용)', sub: '인성이 아침으로 먹기 좋은 메뉴만 모았어요' },
+    dinner: { title: '🌙 저녁 식단 (세 가족 함께)', sub: '3가족이 같이 먹어요 · 매운 메뉴는 인성이 몫을 따로 챙겨요' },
+    salad: { title: '🥗 어른 간편 샐러드', sub: '엄마·아빠 간편 한 끼나 저녁 곁들임용이에요' }
+  };
+
   var state = {
     data: null,
     tab: 'all',
@@ -241,16 +247,17 @@
     var diff = daysUntil(entry.date);
     var md = monthDay(entry.date, entry.dayLabel);            // 11/16(월)
     var human = md.replace('(', ' ').replace(')', '');        // 11/16 월
-    var label;
-    if (isToday) { label = '오늘 유치원 점심'; }
-    else if (diff === 1) { label = '내일(' + human + ') 유치원 점심'; }
-    else { label = md + ' 유치원 점심'; }
+    var label, dayText;
+    if (isToday) { label = '오늘 유치원 점심'; dayText = '오늘 점심'; }
+    else if (diff === 1) { label = '내일(' + human + ') 유치원 점심'; dayText = '내일(' + human + ') 점심'; }
+    else { label = md + ' 유치원 점심'; dayText = md + ' 점심'; }
 
     return {
       active: true,
       entry: entry,
       diff: diff,
       label: label,
+      dayText: dayText,
       isToday: isToday,
       shortDate: md,
       schoolName: lm.schoolName,
@@ -269,11 +276,10 @@
   }
 
   /* 점심과 겹치는 메뉴 이름을 찾아 '11/16(월) 점심 ‘어묵국’과 겹침' 형태로 돌려줘요. */
-  function clashOf(meal, lunch) {
+  function findClash(tags, lunch) {
     if (!lunch || !lunch.active) { return null; }
     var items = Array.isArray(lunch.entry.items) ? lunch.entry.items : [];
     var avoid = Array.isArray(lunch.entry.avoidTags) ? lunch.entry.avoidTags : [];
-    var tags = mealTags(meal);
     var hit = null, i, j;
 
     for (i = 0; i < tags.length && !hit; i++) {
@@ -288,8 +294,20 @@
         }
       }
     }
+    return hit;
+  }
+
+  function clashOf(meal, lunch) {
+    var hit = findClash(mealTags(meal), lunch);
     if (!hit) { return null; }
     return { menu: hit, text: lunch.shortDate + ' 점심 ‘' + hit + '’과 겹침' };
+  }
+
+  function kidClashOf(meal, lunch) {
+    if (!meal || !meal.kidMenu) { return null; }
+    var hit = findClash(mealTags(meal.kidMenu), lunch);
+    if (!hit) { return null; }
+    return { menu: hit, text: '인성이 별도 메뉴 ‘' + hit + '’도 ' + lunch.shortDate + ' 점심과 겹침' };
   }
 
   /* ---------------- partial renders ---------------- */
@@ -336,43 +354,64 @@
       '</section>';
   }
 
-  function mealCard(meal, stock, lunch) {
-    var uses = Array.isArray(meal.uses) ? meal.uses : [];
-    var ings = uses.map(function (u) {
+  function courseOf(meal) {
+    if (meal.course === 'salad') { return 'salad'; }
+    if (meal.course === 'dinner' || meal.mealTime === '저녁') { return 'dinner'; }
+    return 'breakfast';
+  }
+
+  function ingChips(uses, stock) {
+    return (Array.isArray(uses) ? uses : []).map(function (u) {
       var st = stockState(u, stock);
       return '<span class="ing ' + st + '">' +
         (st === 'ok' ? '✅ ' : st === 'soon' ? '📦 ' : '🛒 ') + esc(u) + '</span>';
     }).join('');
+  }
+
+  function mealCard(meal, stock, lunch) {
+    var course = courseOf(meal);
+    var whenCls = course === 'dinner' ? 'evening' : (course === 'salad' ? 'salad' : 'morning');
+    var whenTxt = course === 'salad' ? '🥗 샐러드' : (course === 'dinner' ? '🌙 저녁' : '🌅 아침');
+    var who = meal.who ? '<span class="meal-who">' + esc(meal.who) + '</span>' : '';
     var steps = (Array.isArray(meal.steps) ? meal.steps : []).map(function (s, idx) {
       return '<li><span class="n">' + (idx + 1) + '</span><span>' + esc(s) + '</span></li>';
     }).join('');
-    var isDinner = meal.mealTime === '저녁';
-    var when = meal.mealTime
-      ? '<span class="meal-when ' + (isDinner ? 'evening' : 'morning') + '">' +
-          (isDinner ? '🌙 저녁 추천' : '🌅 아침 추천') + '</span>'
-      : '';
-    var who = meal.who ? '<span class="meal-who">' + esc(meal.who) + '</span>' : '';
-    var clash = clashOf(meal, lunch);
-    var mark = lunch && lunch.active
-      ? (clash
-          ? '<span class="meal-clash">⚠️ ' + esc(clash.text) + '</span>'
-          : '<span class="meal-away">✨ 점심과 안 겹쳐요</span>')
-      : '';
+    var ings = ingChips(meal.uses, stock);
+    var adult = clashOf(meal, lunch);
+    var kid = kidClashOf(meal, lunch);
+    var marks = '';
+    if (lunch && lunch.active) {
+      if (adult) { marks += '<span class="meal-clash">⚠️ ' + esc(adult.text) + '</span>'; }
+      if (kid) { marks += '<span class="meal-clash">⚠️ ' + esc(kid.text) + '</span>'; }
+      if (!adult && !kid) { marks += '<span class="meal-away">✨ 점심과 안 겹쳐요</span>'; }
+    }
+    var kidBox = '';
+    if (meal.kidMenu) {
+      var kidIngs = ingChips(meal.kidMenu.uses, stock);
+      kidBox = '<div class="kid-menu">' +
+        '<p class="kid-label">👶 인성이 별도 메뉴</p>' +
+        '<p class="kid-title">' + esc(meal.kidMenu.title || '') + '</p>' +
+        (kidIngs ? '<div class="ings">' + kidIngs + '</div>' : '') +
+        '</div>';
+    }
     return '' +
-      '<article class="meal' + (clash ? ' is-clash' : '') + '">' +
+      '<article class="meal meal-' + course + (adult || kid ? ' is-clash' : '') + '">' +
         '<div class="meal-top">' +
           '<div class="meal-emoji" aria-hidden="true">' + esc(meal.emoji || '🍳') + '</div>' +
           '<div class="meal-head">' +
             '<h3 class="meal-title">' + esc(meal.title) + '</h3>' +
             '<div class="meal-sub">' +
-              when + who +
+              '<span class="meal-when ' + whenCls + '">' + whenTxt + '</span>' +
+              who +
               '<span class="mini">⏱ ' + esc(meal.time || '') + '</span>' +
               '<span class="mini">' + esc(meal.difficulty || '') + '</span>' +
             '</div>' +
           '</div>' +
         '</div>' +
-        (mark ? '<div class="meal-mark">' + mark + '</div>' : '') +
+        (marks ? '<div class="meal-mark">' + marks + '</div>' : '') +
+        (meal.memo ? '<p class="meal-memo">📝 ' + esc(meal.memo) + '</p>' : '') +
         (ings ? '<div class="ings">' + ings + '</div>' : '') +
+        kidBox +
         (steps ? '<ol class="steps">' + steps + '</ol>' : '') +
       '</article>';
   }
@@ -389,15 +428,14 @@
     var stock = inStock();
     var lunch = targetLunch();
     list.sort(function (a, b) {
-      var ca = clashOf(a, lunch) ? 1 : 0;
-      var cb = clashOf(b, lunch) ? 1 : 0;
+      var ca = (clashOf(a, lunch) ? 1 : 0) + (kidClashOf(a, lunch) ? 1 : 0);
+      var cb = (clashOf(b, lunch) ? 1 : 0) + (kidClashOf(b, lunch) ? 1 : 0);
       if (ca !== cb) { return ca - cb; }
       var sa = stockScore(a, stock);
       var sb = stockScore(b, stock);
       if (sb !== sa) { return sb - sa; }
-      var ta = a.mealTime === '아침' ? 0 : 1;
-      var tb = b.mealTime === '아침' ? 0 : 1;
-      return ta - tb;
+      var order = { breakfast: 0, dinner: 1, salad: 2 };
+      return order[courseOf(a)] - order[courseOf(b)];
     });
     return list;
   }
@@ -408,8 +446,8 @@
       return '' +
         '<div class="lunch-banner">' +
           '<div class="lunch-top">' +
-            '<span class="lunch-emoji" aria-hidden="true">🍱</span>' +
-            '<span class="lunch-title">인성이 점심 식단 연동</span>' +
+            '<span class="lunch-emoji" aria-hidden="true">🏫</span>' +
+            '<span class="lunch-title">라이즈 점심 식단 연동</span>' +
             '<span class="lunch-state">대기 중</span>' +
           '</div>' +
           '<p class="lunch-note">' + esc(lunch.note || '인성이 점심 식단표 보내주시면 겹치지 않게 아침·저녁을 맞춰 추천해요!') + '</p>' +
@@ -427,10 +465,11 @@
     return '' +
       '<div class="lunch-banner on">' +
         '<div class="lunch-top">' +
-          '<span class="lunch-emoji" aria-hidden="true">🍱</span>' +
-          '<span class="lunch-title">' + esc(lunch.label) + '</span>' +
+          '<span class="lunch-emoji" aria-hidden="true">🏫</span>' +
+          '<span class="lunch-title">라이즈 점심 식단 연동</span>' +
           '<span class="lunch-state">연동됨</span>' +
         '</div>' +
+        '<p class="lunch-day">' + esc(lunch.dayText) + '</p>' +
         '<p class="lunch-today">' + esc(items.join(' · ')) + '</p>' +
         '<p class="lunch-note">' +
           (entry.snack ? '간식 ' + esc(entry.snack) + ' · ' : '') +
@@ -450,19 +489,20 @@
     var items = Array.isArray(lunch.entry.items) ? lunch.entry.items : [];
     var head = items.slice(0, 3).join(' · ');
     var rest = items.length > 3 ? ' 외 ' + (items.length - 3) : '';
-    return '<p class="home-lunch">🍱 ' + esc(lunch.label.replace(' 유치원 점심', '')) + ' 점심 · ' +
+    return '<p class="home-lunch">🍱 ' + esc(lunch.dayText) + ' · ' +
       esc(head + rest) + '<span>겹치지 않는 메뉴 먼저</span></p>';
   }
 
-  function mealGroup(time, list, stock, lunch) {
+  function courseSection(course, list, stock, lunch) {
     if (list.length === 0) { return ''; }
-    var isDinner = time === '저녁';
+    var meta = COURSE_META[course];
     return '' +
       '<div class="meal-group">' +
         '<div class="sec-head">' +
-          '<h2 class="sec-title">' + (isDinner ? '🌙 저녁 추천' : '🌅 아침 추천') + '</h2>' +
+          '<h2 class="sec-title">' + meta.title + '</h2>' +
           '<span class="sec-count">' + list.length + '개</span>' +
         '</div>' +
+        '<p class="sec-sub course-sub">' + meta.sub + '</p>' +
         list.map(function (m) { return mealCard(m, stock, lunch); }).join('') +
       '</div>';
   }
@@ -479,29 +519,37 @@
         '지금은 추천할 식단이 없어요<br>재료가 들어오면 바로 채워드릴게요</div></section>';
     }
 
+    var breakfasts = list.filter(function (m) { return courseOf(m) === 'breakfast'; });
+    var dinners = list.filter(function (m) { return courseOf(m) === 'dinner'; });
+    var salads = list.filter(function (m) { return courseOf(m) === 'salad'; });
+    var clean = function (m) { return !clashOf(m, lunch) && !kidClashOf(m, lunch); };
+
     if (isAll) {
-      /* 홈 하이라이트: 점심과 안 겹치는 아침 하나 + 저녁 하나 */
-      var morning = list.filter(function (m) { return m.mealTime === '아침' && !clashOf(m, lunch); })[0] ||
-        list.filter(function (m) { return m.mealTime === '아침'; })[0];
-      var dinner = list.filter(function (m) { return m.mealTime === '저녁' && !clashOf(m, lunch); })[0] ||
-        list.filter(function (m) { return m.mealTime === '저녁'; })[0];
-      var picks = [morning, dinner].filter(Boolean);
-      if (picks.length === 0) { picks = list.slice(0, 2); }
+      /* 홈: 인성이 아침 1개 + 세 가족 저녁 1~2개 (점심과 안 겹치는 것 우선) */
+      var bf = breakfasts.filter(clean)[0] || breakfasts[0];
+      var din = dinners.filter(clean).slice(0, 2);
+      if (din.length === 0) { din = dinners.slice(0, 2); }
+      var blocks = '';
+      if (bf) {
+        blocks += '<p class="pick-label">🌅 인성이 아침</p>' + mealCard(bf, stock, lunch);
+      }
+      if (din.length) {
+        blocks += '<p class="pick-label">🌙 세 가족 저녁</p>' +
+          din.map(function (m) { return mealCard(m, stock, lunch); }).join('');
+      }
+      var count = (bf ? 1 : 0) + din.length;
       return '' +
         '<section class="section">' +
           '<div class="sec-head">' +
             '<h2 class="sec-title">🍳 오늘 뭐 먹지?</h2>' +
-            '<span class="sec-count">' + picks.length + '개</span>' +
+            '<span class="sec-count">' + count + '개</span>' +
             '<button type="button" class="sec-more" data-goto="meals">전체 보기 ›</button>' +
           '</div>' +
           homeLunchLine(lunch) +
-          picks.map(function (m) { return mealCard(m, stock, lunch); }).join('') +
+          blocks +
         '</section>';
     }
 
-    var mornings = list.filter(function (m) { return m.mealTime !== '저녁'; });
-    var dinners = list.filter(function (m) { return m.mealTime === '저녁'; });
-    var body = mealGroup('아침', mornings, stock, lunch) + mealGroup('저녁', dinners, stock, lunch);
     return '' +
       '<section class="section">' +
         lunchBanner(lunch) +
@@ -509,8 +557,10 @@
           '<h2 class="sec-title">🍳 간단 식단</h2>' +
           '<span class="sec-count">' + list.length + '개</span>' +
         '</div>' +
-        '<p class="sec-sub">아침·저녁으로 나눠서, 유치원 점심과 겹치지 않는 메뉴부터 보여드려요</p>' +
-        body +
+        '<p class="sec-sub">아침은 인성이 전용, 저녁은 세 가족 기준이에요 · 라이즈 점심과 겹치지 않는 메뉴부터 보여드려요</p>' +
+        courseSection('breakfast', breakfasts, stock, lunch) +
+        courseSection('dinner', dinners, stock, lunch) +
+        courseSection('salad', salads, stock, lunch) +
       '</section>';
   }
 
