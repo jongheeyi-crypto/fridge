@@ -6,6 +6,7 @@
   var CATEGORIES = ['전체', '밀키트', '생선·고기', '유제품·빵', '채소·과일', '반찬·소스', '아이 맞춤'];
   var TABS = [
     { id: 'all', emoji: '🏠', label: '전체 보기' },
+    { id: 'week', emoji: '📅', label: '주간 식단' },
     { id: 'fridge', emoji: '❄️', label: '냉장실' },
     { id: 'freezer', emoji: '🧊', label: '냉동실' },
     { id: 'meals', emoji: '🍳', label: '간단 식단' },
@@ -518,6 +519,240 @@
       esc(head + rest) + '<span>겹치지 않는 메뉴 먼저</span></p>';
   }
 
+  /* ---------------- 📅 주간 식단 ---------------- */
+
+  function weekPlan() {
+    var w = state.data && state.data.weekPlan;
+    if (!w || typeof w !== 'object' || !Array.isArray(w.days) || w.days.length === 0) { return null; }
+    return w;
+  }
+
+  function weekRange(w) {
+    var first = w.days[0];
+    var last = w.days[w.days.length - 1];
+    return monthDay(w.startDate || first.date, first.dayLabel) + ' ~ ' +
+      monthDay(w.endDate || last.date, last.dayLabel);
+  }
+
+  function schoolEntry(date) {
+    var lm = lunchData();
+    if (!lm) { return null; }
+    for (var i = 0; i < lm.schedule.length; i++) {
+      if (lm.schedule[i] && lm.schedule[i].date === date) { return lm.schedule[i]; }
+    }
+    return null;
+  }
+
+  function dayBadge(iso) {
+    var n = daysUntil(iso);
+    if (n === null) { return ''; }
+    if (n === 0) { return '<span class="day-badge today">오늘</span>'; }
+    if (n === 1) { return '<span class="day-badge tomorrow">내일</span>'; }
+    if (n < 0) { return '<span class="day-badge past">지난</span>'; }
+    return '';
+  }
+
+  /* 식단의 재료 이름을 냉장고 재료와 느슨하게 맞춰 찾아요. */
+  function findStockItem(label) {
+    var k = norm(label);
+    if (!k) { return null; }
+    var list = allItems(), i, n;
+    for (i = 0; i < list.length; i++) {
+      if (norm(list[i].item.name) === k) { return list[i].item; }
+    }
+    for (i = 0; i < list.length; i++) {
+      n = norm(list[i].item.name);
+      if (n.indexOf(k) !== -1 || k.indexOf(n) !== -1) { return list[i].item; }
+    }
+    return null;
+  }
+
+  function weekChips(uses) {
+    var stock = inStock();
+    return (Array.isArray(uses) ? uses : []).map(function (u) {
+      var st = stockState(u, stock);
+      var item = findStockItem(u);
+      var prio = !!item && isPriority(item);
+      var icon = prio ? '🔥' : (st === 'ok' ? '✅' : st === 'soon' ? '📦' : '🛒');
+      return '<span class="ing ' + st + (prio ? ' prio' : '') + '">' + icon + ' ' + esc(u) + '</span>';
+    }).join('');
+  }
+
+  /* 그날 라이즈 점심과 겹치는 메뉴 이름 (없으면 null) */
+  function clashWithEntry(meal, entry) {
+    if (!meal || !entry) { return null; }
+    var tags = mealTags(meal);
+    if (!tags.length) { return null; }
+    var fake = { active: true, entry: entry, shortDate: monthDay(entry.date, entry.dayLabel) };
+    return findClash(tags, fake);
+  }
+
+  function weekKidBox(kid, entry) {
+    if (!kid) { return ''; }
+    var clash = clashWithEntry(kid, entry);
+    return '' +
+      '<div class="kid-menu">' +
+        '<p class="kid-label">👶 인성이 별도 메뉴</p>' +
+        '<p class="kid-title">' + esc(kid.title || '') + '</p>' +
+        (kid.uses ? '<div class="ings">' + weekChips(kid.uses) + '</div>' : '') +
+        (clash ? '<p class="kid-warn">⚠️ ' + esc(clash) + ' 겹침</p>' : '') +
+        (kid.memo ? '<p class="slot-memo">' + esc(kid.memo) + '</p>' : '') +
+      '</div>';
+  }
+
+  function weekSlot(kind, label, meal, entry, check) {
+    if (!meal) { return ''; }
+    var clash = (check && entry) ? clashWithEntry(meal, entry) : null;
+    var kidClash = (check && entry && meal.kidMenu) ? clashWithEntry(meal.kidMenu, entry) : null;
+    var chips = weekChips(meal.uses);
+    var mark = '';
+    if (check && entry) {
+      mark = (clash || kidClash)
+        ? '<span class="wmark warn">⚠️ ' + esc(clash || kidClash) + ' 겹침</span>'
+        : '<span class="wmark ok">✅ 라이즈 점심과 안 겹쳐요</span>';
+    }
+    var who = (meal.who && kind !== 'lunch' && kind !== 'snack')
+      ? '<span class="slot-who">' + esc(meal.who) + '</span>' : '';
+    return '' +
+      '<div class="slot slot-' + kind + '">' +
+        '<div class="slot-head">' +
+          '<span class="slot-label">' + label + '</span>' +
+          who +
+          (meal.time ? '<span class="slot-time">⏱ ' + esc(meal.time) + '</span>' : '') +
+        '</div>' +
+        '<p class="slot-title">' + (meal.emoji ? esc(meal.emoji) + ' ' : '') + esc(meal.title || '') + '</p>' +
+        (chips ? '<div class="ings">' + chips + '</div>' : '') +
+        (mark ? '<div class="wmark-row">' + mark + '</div>' : '') +
+        (meal.memo ? '<p class="slot-memo">' + esc(meal.memo) + '</p>' : '') +
+        weekKidBox(meal.kidMenu, entry) +
+      '</div>';
+  }
+
+  function schoolSlot(entry) {
+    if (!entry) { return ''; }
+    var items = Array.isArray(entry.items) ? entry.items : [];
+    var avoid = Array.isArray(entry.avoidTags) ? entry.avoidTags : [];
+    return '' +
+      '<div class="slot slot-school">' +
+        '<div class="slot-head">' +
+          '<span class="slot-label">🏫 라이즈 점심 (인성이 유치원)</span>' +
+          (entry.snack ? '<span class="slot-time">간식 ' + esc(entry.snack) + '</span>' : '') +
+        '</div>' +
+        '<p class="slot-title small">' + esc(items.join(' · ')) + '</p>' +
+        (avoid.length
+          ? '<p class="slot-memo school-avoid">이날 인성이 아침·저녁엔 ' + esc(avoid.join(' · ')) + ' 안 써요</p>'
+          : '') +
+      '</div>';
+  }
+
+  function weekDayCard(day) {
+    if (!day || !parseYMD(day.date)) { return ''; }
+    var entry = schoolEntry(day.date);
+    var n = daysUntil(day.date);
+    var cls = 'day-card' + (n === 0 ? ' is-today' : '') + (n !== null && n < 0 ? ' is-past' : '');
+    var out = [];
+    out.push('<article class="' + cls + '" id="day-' + esc(day.date) + '">');
+    out.push('<div class="day-head">' +
+      '<span class="dd-num">' + esc(monthDay(day.date)) + '</span>' +
+      '<span class="dd-wd">' + esc(day.dayLabel || '') + '요일</span>' +
+      dayBadge(day.date) +
+      '<span class="day-flag">' + (entry ? '평일 · 유치원 점심 연동' : '주말 · 3가족') + '</span>' +
+      '</div>');
+    out.push(weekSlot('breakfast', '🌅 인성이 아침', day.breakfast, entry, true));
+    out.push(weekSlot('lunch', day.weekend ? '🍱 주말 점심' : '🥗 엄마 점심', day.lunch, entry, false));
+    out.push(schoolSlot(entry));
+    out.push(weekSlot('dinner', '🌙 세 가족 저녁', day.dinner, entry, true));
+    out.push(weekSlot('snack', '🍪 간식·곁들임', day.snack, entry, false));
+    if (day.dayMemo) { out.push('<p class="day-memo">📝 ' + esc(day.dayMemo) + '</p>'); }
+    out.push('</article>');
+    return out.join('');
+  }
+
+  function weekStats(w) {
+    var total = 0, used = {}, names = {};
+    allItems().forEach(function (x) { if (isPriority(x.item)) { total++; } });
+    w.days.forEach(function (d) {
+      [d.breakfast, d.lunch, d.snack, d.dinner].forEach(function (m) {
+        if (!m) { return; }
+        [m.uses, m.kidMenu ? m.kidMenu.uses : null].forEach(function (uses) {
+          (Array.isArray(uses) ? uses : []).forEach(function (u) {
+            var it = findStockItem(u);
+            if (!it) { return; }
+            names[it.name] = true;
+            if (isPriority(it)) { used[it.name] = true; }
+          });
+        });
+      });
+    });
+    return {
+      days: w.days.length,
+      prioTotal: total,
+      prioUsed: Object.keys(used).length,
+      items: Object.keys(names).length
+    };
+  }
+
+  function weekTeaser() {
+    var w = weekPlan();
+    if (!w) { return ''; }
+    var s = weekStats(w);
+    return '' +
+      '<button type="button" class="week-teaser" data-goto="week">' +
+        '<span class="wt-emoji" aria-hidden="true">📅</span>' +
+        '<span class="wt-body">' +
+          '<span class="wt-title">' + esc(w.title || '이번 주 식단') + '</span>' +
+          '<span class="wt-sub">' + esc(weekRange(w)) + ' · 7일 식단 보기' +
+            (s.prioTotal ? ' · 🔥 우선 소진 ' + s.prioUsed + '/' + s.prioTotal + '종' : '') +
+            ' ›</span>' +
+        '</span>' +
+      '</button>';
+  }
+
+  function weekSection() {
+    var w = weekPlan();
+    if (!w) {
+      return '<section class="section"><div class="empty"><span class="big">📅</span>' +
+        '아직 주간 식단표가 없어요</div></section>';
+    }
+    var s = weekStats(w);
+    var head = '' +
+      '<div class="week-hero">' +
+        '<p class="week-kicker">🍽 7일 냉장고 파먹기</p>' +
+        '<h2 class="week-title">' + esc(w.title || '이번 주 식단') + '</h2>' +
+        '<p class="week-range">' + esc(weekRange(w)) + '</p>' +
+        (w.note ? '<p class="week-note">' + esc(w.note) + '</p>' : '') +
+        '<div class="week-stats">' +
+          '<span class="wstat">📅 ' + s.days + '일</span>' +
+          '<span class="wstat">🍽 하루 세 끼</span>' +
+          (s.prioTotal ? '<span class="wstat">🔥 우선 소진 <b>' + s.prioUsed + '/' + s.prioTotal + '</b>종</span>' : '') +
+          '<span class="wstat">🧺 재료 ' + s.items + '가지</span>' +
+        '</div>' +
+      '</div>';
+
+    var jump = '<div class="day-jump" id="dayJump">' +
+      '<button type="button" class="dchip active" data-day="top">전체</button>' +
+      w.days.map(function (d) {
+        var n = daysUntil(d.date);
+        return '<button type="button" class="dchip' + (n === 0 ? ' is-today' : '') +
+          (n !== null && n < 0 ? ' is-past' : '') + '" data-day="' + esc(d.date) + '">' +
+          (d.dayLabel || '') + ' <span class="dn">' + esc(monthDay(d.date)) + '</span></button>';
+      }).join('') +
+      '</div>';
+
+    var leftover = '';
+    if (Array.isArray(w.leftovers) && w.leftovers.length) {
+      leftover = '<div class="wleft">' +
+        '<p class="wleft-title">🧺 이번 주에 다 못 쓴 재료 · 다음 주 후보</p>' +
+        '<ul class="wleft-list">' + w.leftovers.map(function (x) {
+          return '<li><b>' + esc(x.name) + '</b> · ' + esc(x.memo || '') + '</li>';
+        }).join('') + '</ul>' +
+        '</div>';
+    }
+
+    return '<section class="section week-page">' + head + jump +
+      w.days.map(weekDayCard).join('') + leftover + '</section>';
+  }
+
   function courseSection(course, list, stock, lunch) {
     if (list.length === 0) { return ''; }
     var meta = COURSE_META[course];
@@ -685,7 +920,7 @@
   }
 
   function renderToolbar() {
-    var showSearch = state.tab !== 'shop';
+    var showSearch = state.tab !== 'shop' && state.tab !== 'week';
     var showChips = state.tab === 'all' || state.tab === 'fridge' || state.tab === 'freezer';
     el('toolbar').hidden = !showSearch;
     el('chips').hidden = !showChips;
@@ -713,7 +948,10 @@
 
     var parts = [];
 
-    if (state.tab === 'meals') {
+    if (state.tab === 'week') {
+      parts.push(weekSection());
+    } else if (state.tab === 'meals') {
+      parts.push(weekTeaser());
       parts.push(mealsSection(0));
     } else if (state.tab === 'shop') {
       parts.push(shoppingSection());
@@ -731,6 +969,7 @@
         c.innerHTML = emptyAll();
         return;
       }
+      if (!searching) { parts.push(weekTeaser()); }
       if (!searching) { parts.push(mealsSection(2)); }
       else if (mealCount > 0) { parts.push(mealsSection(2)); }
       parts.push(itemsSection('fridge', true));
@@ -769,6 +1008,19 @@
     });
 
     el('content').addEventListener('click', function (e) {
+      var dayBtn = e.target.closest('[data-day]');
+      if (dayBtn) {
+        var jump = el('dayJump');
+        if (jump) {
+          Array.prototype.forEach.call(jump.querySelectorAll('[data-day]'), function (b) {
+            b.classList.toggle('active', b === dayBtn);
+          });
+        }
+        var target = dayBtn.getAttribute('data-day');
+        var card = target === 'top' ? el('content') : document.getElementById('day-' + target);
+        if (card && card.scrollIntoView) { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        return;
+      }
       var btn = e.target.closest('[data-goto]');
       if (!btn) { return; }
       state.tab = btn.getAttribute('data-goto');
