@@ -1049,7 +1049,7 @@
     out.push(weekSlot('lunch', day.weekend ? '🍱 주말 점심' : '🥗 엄마 점심', day.lunch, entry, false, v.lunch, w));
     out.push(schoolSlot(entry));
     out.push(weekSlot('dinner', '🌙 세 가족 저녁', day.dinner, entry, true, v.dinner, w));
-    out.push(weekSlot('snack', '🍪 간식·곁들임', day.snack, entry, false, v.snack, w));
+    out.push(weekSlot('snack', '🍪 주말 간식 (유치원 쉬는 날)', day.snack, entry, false, v.snack, w));
     if (day.dayMemo) { out.push('<p class="day-memo">📝 ' + esc(day.dayMemo) + '</p>'); }
     out.push('</article>');
     return out.join('');
