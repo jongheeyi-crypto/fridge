@@ -602,6 +602,18 @@
 
   function weekSlot(kind, label, meal, entry, check) {
     if (!meal) { return ''; }
+    if (meal.skipped) {
+      /* 외출·패스한 끼: 흐리게 표시하고 겹침 검증·재료 칩은 건너뛰어요. */
+      return '' +
+        '<div class="slot slot-' + kind + ' slot-skipped">' +
+          '<div class="slot-head">' +
+            '<span class="slot-label">' + label + '</span>' +
+            '<span class="skip-badge">⏭️ 외출 · 패스</span>' +
+          '</div>' +
+          '<p class="slot-title">' + (meal.emoji ? esc(meal.emoji) + ' ' : '') + esc(meal.title || '이 끼니는 안 먹어요') + '</p>' +
+          (meal.memo ? '<p class="slot-memo">' + esc(meal.memo) + '</p>' : '') +
+        '</div>';
+    }
     var clash = (check && entry) ? clashWithEntry(meal, entry) : null;
     var kidClash = (check && entry && meal.kidMenu) ? clashWithEntry(meal.kidMenu, entry) : null;
     var chips = weekChips(meal.uses);

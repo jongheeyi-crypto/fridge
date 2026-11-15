@@ -964,6 +964,25 @@ body {
 .slot-school { background: #F8F3FF; border-color: #E7DCF8; }
 .slot-dinner { background: #F5F7FF; border-color: #E1E6FA; }
 .slot-snack { background: #FFF7F9; border-color: #FFE4EA; }
+.slot-skipped {
+  background: #F8F6F2;
+  border-color: #E7E1D8;
+  border-style: dashed;
+}
+.slot-skipped .slot-label { color: #A79C91; }
+.slot-skipped .slot-title { color: #8E847A; font-weight: 700; }
+.slot-skipped .slot-memo { color: #A79C91; }
+.skip-badge {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #FFFFFF;
+  border: 1px dashed #D8CFC2;
+  color: #8A7F72;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
 .slot-head { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
 .slot-label { font-size: 11px; font-weight: 800; color: #6E6660; letter-spacing: -0.2px; }
 .slot-who {
