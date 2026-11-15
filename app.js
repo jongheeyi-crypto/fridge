@@ -586,7 +586,7 @@
             '<button type="button" class="sec-more" data-goto="meals">전체 보기 ›</button>' +
           '</div>' +
           homeLunchLine(lunch) +
-          (priorityCount() ? '<p class="home-clear">🔥 냉장고 파먹기 1순위 · 냉동실에 있던 재료부터 씨요</p>' : '') +
+          (priorityCount() ? '<p class="home-clear">🔥 냉장고 파먹기 1순위 · 냉동실에 있던 재료부터 써요</p>' : '') +
           blocks +
         '</section>';
     }
