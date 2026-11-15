@@ -947,18 +947,37 @@
     oxToast('↺ 이번 주 체크를 모두 지웠어요');
   }
 
-  /* ---------------- 🧂 집 조미료·부재료 체크 ---------------- */
+  /* ---------------- 🧺 실온·조미료 체크 ---------------- */
   /* 체크는 이 폰의 localStorage에만 저장하고 data.json은 건드리지 않아요.
-     data.json의 checked는 '처음 값'으로만 쓰고, 냉장·냉동 재고 숫자에는 넣지 않아요. */
+     data.json의 checked는 '처음 값'으로만 쓰고, 냉장·냉동 재고 숫자에는 넣지 않아요.
+     조미료(pantry.groups)와 찬장 실온 식품(pantry.roomTemp)을 한 섹션에 같이 담아요. */
 
   var PANTRY_KEY = 'insung_fridge_pantry_v1';
   var pantryStore = null;
-  var pantryFolded = false;
+  var pantryFolded = true;   /* 기본은 접힌 컴팩트 요약 */
 
   function pantryData() {
     var p = state.data && state.data.pantry;
     if (!p || !Array.isArray(p.groups)) { return null; }
     return p;
+  }
+
+  /* 조미료·부재료 그룹 */
+  function pantryGroups() {
+    var p = pantryData();
+    return (p && Array.isArray(p.groups)) ? p.groups : [];
+  }
+
+  /* 찬장 실온 식품 그룹 — data.json의 pantry.roomTemp[] (groups와 같은 형식) */
+  function pantryRoomGroups() {
+    var p = pantryData();
+    return (p && Array.isArray(p.roomTemp)) ? p.roomTemp : [];
+  }
+
+  function eachPantryItem(groups, fn) {
+    groups.forEach(function (g) {
+      (g.items || []).forEach(function (it) { if (it && it.name) { fn(it, g); } });
+    });
   }
 
   function loadPantry() {
@@ -992,15 +1011,11 @@
   }
 
   function pantryDefault(name) {
-    var p = pantryData();
-    if (!p) { return false; }
-    for (var i = 0; i < p.groups.length; i++) {
-      var items = p.groups[i].items || [];
-      for (var j = 0; j < items.length; j++) {
-        if (items[j].name === name) { return !!items[j].checked; }
-      }
-    }
-    return false;
+    var found = false;
+    eachPantryItem(pantryGroups().concat(pantryRoomGroups()), function (it) {
+      if (it.name === name) { found = !!it.checked; }
+    });
+    return found;
   }
 
   function pantryOn(item) {
@@ -1010,23 +1025,34 @@
   }
 
   function pantryNames() {
-    var p = pantryData();
     var names = [];
-    if (!p) { return names; }
-    p.groups.forEach(function (g) {
-      (g.items || []).forEach(function (it) { if (it && it.name) { names.push(it.name); } });
-    });
+    eachPantryItem(pantryGroups().concat(pantryRoomGroups()), function (it) { names.push(it.name); });
     return names;
   }
 
-  function pantryCounts() {
-    var p = pantryData();
+  function pantryGroupCounts(groups) {
     var out = { on: 0, total: 0 };
-    if (!p) { return out; }
-    p.groups.forEach(function (g) {
-      (g.items || []).forEach(function (it) { out.total++; if (pantryOn(it)) { out.on++; } });
+    eachPantryItem(groups, function (it) {
+      out.total++;
+      if (pantryOn(it)) { out.on++; }
     });
     return out;
+  }
+
+  function pantryCounts() { return pantryGroupCounts(pantryGroups()); }
+  function pantryRoomCounts() { return pantryGroupCounts(pantryRoomGroups()); }
+
+  /* 접힌 상태에서 한 줄로 보여주는 요약: 보유 조미료 31종 · 없는 것 1종(쌈장) · 실온 식품 추가 대기 */
+  function pantrySummaryText() {
+    var c = pantryCounts();
+    var missing = [];
+    eachPantryItem(pantryGroups(), function (it) { if (!pantryOn(it)) { missing.push(it.name); } });
+    var room = pantryRoomCounts();
+    var bits = ['보유 조미료 ' + c.on + '종'];
+    bits.push('없는 것 ' + missing.length + '종' +
+      (missing.length ? '(' + missing.slice(0, 2).join('·') + (missing.length > 2 ? ' 외' : '') + ')' : ''));
+    bits.push(room.total ? '실온 식품 ' + room.on + '/' + room.total + '종' : '실온 식품 추가 대기');
+    return bits.join(' · ');
   }
 
   function pantryChip(it) {
@@ -1039,30 +1065,39 @@
       '</button>';
   }
 
+  function pantryGroupBlock(g) {
+    return '' +
+      '<p class="pantry-group">' + esc((g.emoji ? g.emoji + ' ' : '') + (g.label || '')) + '</p>' +
+      '<div class="pantry-grid">' + (g.items || []).map(pantryChip).join('') + '</div>';
+  }
+
   function pantrySection() {
     var p = pantryData();
     if (!p) { return ''; }
     var c = pantryCounts();
-    var groups = p.groups.map(function (g) {
-      return '' +
-        '<p class="pantry-group">' + esc((g.emoji ? g.emoji + ' ' : '') + (g.label || '')) + '</p>' +
-        '<div class="pantry-grid">' + (g.items || []).map(pantryChip).join('') + '</div>';
-    }).join('');
+    var room = pantryRoomGroups();
+    var roomBody = room.length
+      ? '<p class="pantry-room-title">🏠 찬장 실온 식품</p>' +
+        room.map(pantryGroupBlock).join('')
+      : '<p class="pantry-room-empty">🏠 찬장 실온 식품은 아직 없어요 · 실온 식품 캡처를 보내주시면 이 섹션에 같이 담아둘게요</p>';
     return '' +
       '<section class="section pantry-sec' + (pantryFolded ? ' is-folded' : '') + '" id="pantrySec">' +
         '<div class="sec-head">' +
-          '<h2 class="sec-title">' + esc(p.title || '🧂 집 조미료·부재료 체크하기') + '</h2>' +
+          '<h2 class="sec-title">' + esc(p.title || '🧺 실온·조미료') + '</h2>' +
           '<span class="sec-count" id="pantryCount">' + c.on + '/' + c.total + '</span>' +
           '<button type="button" class="pantry-fold" id="pantryFold" aria-expanded="' +
-            (pantryFolded ? 'false' : 'true') + '">' + (pantryFolded ? '펼치기 ▾' : '접기 ▴') + '</button>' +
+            (pantryFolded ? 'false' : 'true') + '">' +
+            (pantryFolded ? '편집/체크하기 ▾' : '접기 ▴') + '</button>' +
         '</div>' +
+        '<p class="pantry-summary" id="pantrySummary">' + esc(pantrySummaryText()) + '</p>' +
         '<p class="sec-sub">' + esc(p.note || '') + '</p>' +
         '<div class="pantry-body">' +
           '<div class="pantry-tools">' +
             '<button type="button" class="pantry-tool" data-pantry-all="1">☑️ 전체 선택</button>' +
             '<button type="button" class="pantry-tool" data-pantry-reset="1">↺ 처음 값으로</button>' +
           '</div>' +
-          groups +
+          pantryGroups().map(pantryGroupBlock).join('') +
+          roomBody +
           '<button type="button" class="pantry-copy" id="pantryCopy">📋 체크한 조미료 복사해서 피클에 보내기</button>' +
         '</div>' +
       '</section>';
@@ -1083,11 +1118,8 @@
     var p = pantryData();
     if (!p) { return ''; }
     var on = [], off = [];
-    p.groups.forEach(function (g) {
-      (g.items || []).forEach(function (it) {
-        if (!it || !it.name) { return; }
-        (pantryOn(it) ? on : off).push(it.name);
-      });
+    eachPantryItem(pantryGroups(), function (it) {
+      (pantryOn(it) ? on : off).push(it.name);
     });
     return [
       '[인성이네 냉장고 조미료 체크]',
@@ -1143,7 +1175,13 @@
 
   function togglePantryFold() {
     pantryFolded = !pantryFolded;
-    refreshPantry();
+    var sec = document.getElementById('pantrySec');
+    if (sec) { sec.classList.toggle('is-folded', pantryFolded); }
+    var btn = document.getElementById('pantryFold');
+    if (btn) {
+      btn.setAttribute('aria-expanded', pantryFolded ? 'false' : 'true');
+      btn.textContent = pantryFolded ? '편집/체크하기 ▾' : '접기 ▴';
+    }
   }
 
   function weekSlot(kind, label, meal, entry, check, sv, w) {
@@ -1299,6 +1337,108 @@
       '</button>';
   }
 
+  /* ---------------- 🍳 오늘 뭐 먹지? (주간 식단 연동) ---------------- */
+  /* 홈 카드가 meals 카탈로그에서 임의로 뽑지 않고, 주간 식단(weekPlan)에서 오늘(KST) 끼니를
+     그대로 가져와요. O/X 미루기(insung_fridge_ox_v1)까지 반영한 결과로 보여주려고
+     주간 식단과 똑같은 computeWeekView를 다시 써요. */
+
+  function homeWeekDay(w) {
+    if (!w || !w.days || !w.days.length) { return null; }
+    var today = isoToday();
+    var first = w.days[0];
+    var last = w.days[w.days.length - 1];
+    var i;
+    for (i = 0; i < w.days.length; i++) {
+      if (w.days[i] && w.days[i].date === today) { return { day: w.days[i], mode: 'today' }; }
+    }
+    if (first.date > today) { return { day: first, mode: 'upcoming' }; }
+    if (last.date < today) { return { day: last, mode: 'past' }; }
+    /* 기간 안이지만 그 날짜가 없을 때 — 다음 날 → 없으면 마지막 날 */
+    for (i = 0; i < w.days.length; i++) {
+      if (w.days[i] && w.days[i].date > today) { return { day: w.days[i], mode: 'upcoming' }; }
+    }
+    return { day: last, mode: 'past' };
+  }
+
+  function homeDayBadge(pick) {
+    var d = pick.day;
+    var stamp = monthDay(d.date, d.dayLabel);
+    if (pick.mode === 'today') { return '오늘 ' + stamp + ' 식단'; }
+    if (pick.mode === 'upcoming') { return '다가오는 ' + stamp + ' 식단'; }
+    return '지난 ' + stamp + ' 식단';
+  }
+
+  /* 그날 한 끼를 콤팩트한 한 줄로: 메뉴 + 시간 + ⭕먹음/❌미룸/↪️미룸들어옴/⏭️패스 + 인성이 별도 */
+  function homeMealRow(kind, label, meal, sv, w) {
+    var st = (sv && sv.state) ? sv.state : null;
+    var inc = (sv && sv.incoming) ? sv.incoming : null;
+    var shown = inc ? inc.meal : meal;
+    var cls = 'ht-row ht-' + kind;
+    var tags = '';
+    if (st === 'eaten') { tags += '<span class="ht-badge eat">⭕ 먹음</span>'; }
+    if (st === 'passed') {
+      tags += '<span class="ht-badge pass">❌ 미룸' +
+        (sv && sv.movedTo ? ' → ' + esc(destText(w, sv.movedTo)) : '') + '</span>';
+    }
+    if (inc) { tags += '<span class="ht-badge moved">↪️ ' + esc(slotStamp(w, inc.from, kind)) + '에서</span>'; }
+
+    if (!shown) {
+      return '<li class="' + cls + ' is-none">' +
+        '<span class="ht-label">' + esc(label) + '</span>' +
+        '<span class="ht-main">' +
+          '<span class="ht-title muted">아직 정한 메뉴가 없어요</span>' +
+          (tags ? '<span class="ht-tags">' + tags + '</span>' : '') +
+        '</span>' +
+      '</li>';
+    }
+
+    var skip = !!shown.skipped;
+    if (skip) { cls += ' is-skip'; }
+    var emoji = shown.emoji ? '<span class="ht-emoji" aria-hidden="true">' + esc(shown.emoji) + '</span>' : '';
+    var time = (!skip && shown.time && shown.time !== '-') ? '<span class="ht-mini">⏱ ' + esc(shown.time) + '</span>' : '';
+    var kid = (shown.kidMenu && shown.kidMenu.title)
+      ? '<span class="ht-kid">' + esc(shown.kidMenu.title) + '</span>' : '';
+    return '<li class="' + cls + '">' +
+      '<span class="ht-label">' + esc(label) + '</span>' +
+      '<span class="ht-main">' +
+        '<span class="ht-line">' + emoji + '<span class="ht-title">' + esc(shown.title || '') + '</span></span>' +
+        ((time || tags) ? '<span class="ht-tags">' + time + tags + '</span>' : '') +
+        kid +
+      '</span>' +
+    '</li>';
+  }
+
+  function homeTodaySection() {
+    var w = weekPlan();
+    if (!w) { return ''; }
+    var pick = homeWeekDay(w);
+    if (!pick || !pick.day) { return ''; }
+    var day = pick.day;
+    var view = computeWeekView(w).view;
+    var v = (view && view[day.date]) || {};
+    var rows = homeMealRow('breakfast', '🌅 인성이 아침', day.breakfast, v.breakfast, w) +
+      homeMealRow('lunch', day.weekend ? '🍱 주말 점심' : '🥗 엄마 점심', day.lunch, v.lunch, w) +
+      homeMealRow('dinner', '🌙 세 가족 저녁', day.dinner, v.dinner, w);
+    var note = '';
+    if (pick.mode === 'upcoming') {
+      note = '<p class="ht-note">이번 주 식단이 아직 시작 전이라 가장 가까운 날로 보여드려요</p>';
+    } else if (pick.mode === 'past') {
+      note = '<p class="ht-note">이번 주 식단이 끝나서 마지막 날 식단으로 보여드려요</p>';
+    }
+    return '' +
+      '<section class="section home-today" id="homeToday">' +
+        '<div class="sec-head">' +
+          '<h2 class="sec-title">🍳 오늘 뭐 먹지?</h2>' +
+          '<span class="ht-day">' + esc(homeDayBadge(pick)) + '</span>' +
+        '</div>' +
+        '<div class="ht-card">' +
+          '<ul class="ht-list">' + rows + '</ul>' +
+          note +
+          '<button type="button" class="ht-go" data-goto="week">📅 주간 식단에서 O/X 체크하기 →</button>' +
+        '</div>' +
+      '</section>';
+  }
+
   function weekSection() {
     var w = weekPlan();
     if (!w) {
@@ -1379,6 +1519,14 @@
     var stock = inStock();
     var isAll = state.tab === 'all';
     var list = mealsFor();
+
+    /* 홈: 주간 식단에 오늘(또는 가장 가까운 날) 식단이 있으면 그대로 연동해서 보여줘요.
+       검색 중이 아니면 주간 식단 카드가 우선이고, 없을 때만 예전 추천으로 폴백해요. */
+    if (isAll && !norm(state.q)) {
+      var linked = homeTodaySection();
+      if (linked) { return linked; }
+    }
+
     if (list.length === 0) {
       if (isAll) { return ''; }
       return '<section class="section">' + lunchBanner(lunch) +
@@ -1393,7 +1541,7 @@
     var clean = function (m) { return !clashOf(m, lunch) && !kidClashOf(m, lunch); };
 
     if (isAll) {
-      /* 홈: 인성이 아침 1개 + 세 가족 저녁 1~2개 (점심과 안 겹치는 것 우선) */
+      /* 홈 폴백(주간 식단이 없거나 검색 중): 인성이 아침 1개 + 세 가족 저녁 1~2개 (점심과 안 겹치는 것 우선) */
       var bf = breakfasts.filter(clean)[0] || breakfasts[0];
       var din = dinners.filter(clean).slice(0, 2);
       if (din.length === 0) { din = dinners.slice(0, 2); }
@@ -1563,12 +1711,13 @@
         c.innerHTML = emptyAll();
         return;
       }
-      if (!searching) { parts.push(pantrySection()); }
       if (!searching) { parts.push(weekTeaser()); }
       if (!searching) { parts.push(mealsSection(2)); }
       else if (mealCount > 0) { parts.push(mealsSection(2)); }
       parts.push(itemsSection('fridge', true));
       parts.push(itemsSection('freezer', true));
+      /* 🧺 실온·조미료 체크는 맨 아래로 내리고 기본은 접힌 컴팩트 요약 */
+      if (!searching) { parts.push(pantrySection()); }
     }
 
     c.innerHTML = parts.join('') || emptyAll();

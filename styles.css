@@ -1047,6 +1047,93 @@ body {
   word-break: keep-all;
 }
 
+/* ---------- 🍳 오늘 뭐 먹지? (주간 식단 연동) ---------- */
+.home-today .sec-head { margin-bottom: 9px; flex-wrap: wrap; }
+.ht-day {
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1.5px solid #FFDFC4;
+  background: #FFF4E8;
+  color: #A9703A;
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.ht-card {
+  padding: 10px 11px 11px;
+  border-radius: var(--radius-card);
+  border: 1.5px solid var(--meal-line);
+  background: linear-gradient(180deg, #FFFDF8 0%, var(--meal-bg) 100%);
+  box-shadow: var(--shadow-sm);
+}
+.ht-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.ht-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 8px 9px;
+  border-radius: 12px;
+  border: 1.5px solid #F1EBE1;
+  background: #FFFFFF;
+}
+.ht-label {
+  flex: 0 0 72px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #9A8567;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+.ht-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ht-line { display: flex; align-items: flex-start; gap: 4px; }
+.ht-emoji { flex: 0 0 auto; font-size: 13px; line-height: 1.35; }
+.ht-title {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #5D5348;
+  line-height: 1.4;
+  letter-spacing: -0.2px;
+  word-break: keep-all;
+}
+.ht-title.muted { color: #B3A79A; font-weight: 600; }
+.ht-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.ht-mini { font-size: 10px; font-weight: 700; color: #A79C91; }
+.ht-badge { padding: 1px 6px; border-radius: 999px; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.ht-badge.eat { border: 1px solid #9CDCB6; background: #EAF9F0; color: #22835A; }
+.ht-badge.pass { border: 1px solid #F8C5BE; background: #FFF1F0; color: #BE5B4E; }
+.ht-badge.moved { border: 1px solid #FBD9AE; background: #FFF6E9; color: #A9772F; }
+.ht-kid {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #B08A6A;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+.ht-row.is-skip { border-style: dashed; border-color: #E9E0D3; background: #FCFAF6; }
+.ht-row.is-none { border-style: dashed; border-color: #E9E0D3; background: #FCFAF6; }
+.ht-note { margin: 7px 2px 0; font-size: 10px; font-weight: 600; color: #B3A79A; line-height: 1.5; }
+.ht-go {
+  width: 100%;
+  margin-top: 9px;
+  padding: 10px 10px;
+  border: none;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #FFB068 0%, #F1934A 100%);
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(241, 147, 74, 0.24);
+  -webkit-tap-highlight-color: transparent;
+}
+.ht-go:active { transform: scale(0.985); }
+
 .week-teaser {
   display: flex;
   align-items: center;
@@ -1291,7 +1378,7 @@ body {
 .footer p { margin: 2px 0; }
 .footer-fine { font-size: 10.5px; color: #D2C8BE; }
 
-/* ---------- 🧂 집 조미료·부재료 체크 ---------- */
+/* ---------- 🧺 실온·조미료 (기본 접힘 컴팩트) ---------- */
 .pantry-sec {
   padding: 12px 12px 13px;
   border-radius: 20px;
@@ -1299,8 +1386,16 @@ body {
   background: linear-gradient(180deg, #FFFDF5 0%, var(--meal-bg) 100%);
   box-shadow: var(--shadow-sm);
 }
-.pantry-sec .sec-head { margin: 0 0 7px; }
+.pantry-sec .sec-head { margin: 0 0 7px; flex-wrap: wrap; }
 .pantry-sec .sec-title { font-size: 16px; }
+.pantry-summary {
+  margin: -1px 0 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8B7A62;
+  line-height: 1.5;
+  word-break: keep-all;
+}
 .pantry-fold {
   margin-left: auto;
   padding: 4px 10px;
@@ -1315,6 +1410,19 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .pantry-sec .sec-sub { margin: -2px 0 8px; color: #B3A387; }
+.pantry-room-title { margin: 14px 0 0; font-size: 11px; font-weight: 800; color: #A08966; }
+.pantry-room-empty {
+  margin: 12px 0 0;
+  padding: 9px 10px;
+  border-radius: 12px;
+  border: 1.5px dashed #EFE2C6;
+  background: #FFFDF6;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #B3A387;
+  line-height: 1.5;
+  word-break: keep-all;
+}
 .pantry-tools { display: flex; gap: 6px; margin-bottom: 6px; }
 .pantry-tool {
   flex: 1 1 0;
@@ -1380,8 +1488,11 @@ body {
 }
 .pantry-copy.is-done { background: linear-gradient(135deg, #4BC08F 0%, #2C9B71 100%); }
 .pantry-copy:active { transform: scale(0.985); }
-.pantry-sec.is-folded .pantry-body,
-.pantry-sec.is-folded .sec-sub { display: none; }
+/* 접힌 상태: 요약 한 줄만 남기고 칩·도구는 숨겨요 */
+.pantry-sec.is-folded { padding: 11px 12px 12px; }
+.pantry-sec.is-folded .pantry-body { display: none; }
+.pantry-sec.is-folded .sec-sub { margin: -2px 0 0; }
+.pantry-sec:not(.is-folded) .pantry-summary { display: none; }
 
 /* ---------- desktop frame ---------- */
 @media (min-width: 560px) {
