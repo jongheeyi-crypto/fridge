@@ -787,6 +787,7 @@ body {
 .meal-when.morning { background: #FFF3DC; border: 1px solid #FFE0AE; color: #B9791F; }
 .meal-when.evening { background: #EDF0FF; border: 1px solid #DAE0FF; color: #5566C4; }
 .meal-when.salad { background: #EFFBF5; border: 1px solid #CBEFE0; color: #2E8F6A; }
+.meal-when.lunch { background: #FFF0F0; border: 1px solid #FBD6D6; color: #C05555; }
 .meal-who {
   padding: 2px 8px;
   border-radius: 999px;

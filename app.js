@@ -15,6 +15,7 @@
 
   var COURSE_META = {
     breakfast: { title: '🌅 아침 식단 (인성이 전용)', sub: '인성이 아침으로 먹기 좋은 메뉴만 모았어요' },
+    lunch: { title: '🥗 엄마 점심 (혼밥)', sub: '엄마가 집에서 혼자 가볍게 먹는 1인분이에요 · 3가족 저녁과는 따로예요' },
     dinner: { title: '🌙 저녁 식단 (세 가족 함께)', sub: '3가족이 같이 먹어요 · 매운 메뉴는 인성이 몫을 따로 챙겨요' },
     salad: { title: '🥗 어른 간편 샐러드', sub: '엄마·아빠 간편 한 끼나 저녁 곁들임용이에요' }
   };
@@ -375,6 +376,7 @@
 
   function courseOf(meal) {
     if (meal.course === 'salad') { return 'salad'; }
+    if (meal.course === 'lunch' || meal.mealTime === '점심') { return 'lunch'; }
     if (meal.course === 'dinner' || meal.mealTime === '저녁') { return 'dinner'; }
     return 'breakfast';
   }
@@ -389,8 +391,8 @@
 
   function mealCard(meal, stock, lunch) {
     var course = courseOf(meal);
-    var whenCls = course === 'dinner' ? 'evening' : (course === 'salad' ? 'salad' : 'morning');
-    var whenTxt = course === 'salad' ? '🥗 샐러드' : (course === 'dinner' ? '🌙 저녁' : '🌅 아침');
+    var whenCls = course === 'dinner' ? 'evening' : (course === 'salad' ? 'salad' : (course === 'lunch' ? 'lunch' : 'morning'));
+    var whenTxt = course === 'salad' ? '🥗 샐러드' : (course === 'dinner' ? '🌙 저녁' : (course === 'lunch' ? '🍚 엄마 점심' : '🌅 아침'));
     var who = meal.who ? '<span class="meal-who">' + esc(meal.who) + '</span>' : '';
     var steps = (Array.isArray(meal.steps) ? meal.steps : []).map(function (s, idx) {
       return '<li><span class="n">' + (idx + 1) + '</span><span>' + esc(s) + '</span></li>';
@@ -453,7 +455,7 @@
       var clash = (clashOf(m, lunch) ? 1 : 0) + (kidClashOf(m, lunch) ? 1 : 0);
       return { meal: m, clash: clash, clear: isPriority(m) ? 1 : 0, score: stockScore(m, stock) };
     });
-    var order = { breakfast: 0, dinner: 1, salad: 2 };
+    var order = { breakfast: 0, lunch: 1, dinner: 2, salad: 3 };
     ranked.sort(function (a, b) {
       /* 1순위: 점심과 안 겹치는 ‘냉장고 파먹기’ 식단 → 그다음 안 겹치는 식단 → 겹치는 식단 */
       var ga = a.clash === 0 ? (a.clear ? 0 : 1) : 2;
@@ -1181,6 +1183,7 @@
     }
 
     var breakfasts = list.filter(function (m) { return courseOf(m) === 'breakfast'; });
+    var lunches = list.filter(function (m) { return courseOf(m) === 'lunch'; });
     var dinners = list.filter(function (m) { return courseOf(m) === 'dinner'; });
     var salads = list.filter(function (m) { return courseOf(m) === 'salad'; });
     var clean = function (m) { return !clashOf(m, lunch) && !kidClashOf(m, lunch); };
@@ -1219,8 +1222,9 @@
           '<h2 class="sec-title">🍳 간단 식단</h2>' +
           '<span class="sec-count">' + list.length + '개</span>' +
         '</div>' +
-        '<p class="sec-sub">아침은 인성이 전용, 저녁은 세 가족 기준이에요 · 🔥 냉장고 파먹기 1순위 → 라이즈 점심과 안 겹치는 메뉴 순서예요</p>' +
+        '<p class="sec-sub">아침은 인성이 전용, 점심은 엄마 혼자, 저녁은 세 가족 기준이에요 · 🔥 냉장고 파먹기 1순위 → 라이즈 점심과 안 겹치는 메뉴 순서예요</p>' +
         courseSection('breakfast', breakfasts, stock, lunch) +
+        courseSection('lunch', lunches, stock, lunch) +
         courseSection('dinner', dinners, stock, lunch) +
         courseSection('salad', salads, stock, lunch) +
       '</section>';
