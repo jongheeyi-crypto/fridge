@@ -761,10 +761,21 @@
     }).join('');
   }
 
+  /* 메인 + 서브반찬 + 국의 겹침 태그를 한데 모아요 (이동·겹침 검사용) */
+  function allMealTags(meal) {
+    if (!meal) { return []; }
+    var out = [];
+    [meal, meal.side, meal.soup].forEach(function (m) {
+      if (!m) { return; }
+      mealTags(m).forEach(function (t) { if (out.indexOf(t) === -1) { out.push(t); } });
+    });
+    return out;
+  }
+
   /* 그날 라이즈 점심과 겹치는 메뉴 이름 (없으면 null) */
   function clashWithEntry(meal, entry) {
     if (!meal || !entry) { return null; }
-    var tags = mealTags(meal);
+    var tags = allMealTags(meal);
     if (!tags.length) { return null; }
     var fake = { active: true, entry: entry, shortDate: monthDay(entry.date, entry.dayLabel) };
     return findClash(tags, fake);
@@ -879,8 +890,16 @@
   /* 미룰 끼니가 그날 라이즈 점심과 겹치는지 볼 때 쓰는 태그
      (매운 저녁은 인성이 별도 메뉴 기준, 그 밖엔 메뉴 자체 기준) */
   function deferTags(meal, course) {
-    if (course === 'dinner' && meal && meal.kidMenu) { return mealTags(meal.kidMenu); }
-    return mealTags(meal);
+    var out = [];
+    function merge(list) {
+      (list || []).forEach(function (t) { if (out.indexOf(t) === -1) { out.push(t); } });
+    }
+    if (course === 'dinner' && meal && meal.kidMenu) { merge(mealTags(meal.kidMenu)); }
+    else { merge(mealTags(meal)); }
+    /* 서브반찬·국도 인성이 같이 먹으면 그날 점심과 겹치면 안 돼요 */
+    if (meal && meal.side) { merge(mealTags(meal.side)); }
+    if (meal && meal.soup) { merge(mealTags(meal.soup)); }
+    return out;
   }
 
   function entryClash(tags, entry) {
