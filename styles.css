@@ -18,6 +18,11 @@
   --freeze: #7C9BFF;
   --freeze-deep: #5069D6;
 
+  --room-bg: #FFF6EA;
+  --room-line: #FBE3C9;
+  --room: #F2B27A;
+  --room-deep: #B8763A;
+
   --urgent-bg: #FFF0EC;
   --urgent: #FF6B6B;
   --warn-bg: #FFF6E2;
@@ -156,6 +161,7 @@ body {
 .pill b { font-weight: 800; font-size: 13px; }
 .pill.cold { color: var(--fridge-deep); background: #F4FCFA; border-color: var(--fridge-line); }
 .pill.frozen { color: var(--freeze-deep); background: #F7FAFF; border-color: var(--freeze-line); }
+.pill.room { color: var(--room-deep); background: #FFF9F1; border-color: var(--room-line); }
 .pill.soon { color: #E05A5A; background: var(--urgent-bg); border-color: #FFDCD5; }
 .pill.coming { color: #6D5CA8; background: #F7F3FF; border-color: #E4DAFA; }
 .pill.clear { color: #B9601A; background: #FFF4E8; border-color: #FFDCC0; }
@@ -182,7 +188,7 @@ body {
   top: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 3px;
   margin: 12px -14px 0;
   padding: 9px 14px;
@@ -225,6 +231,10 @@ body {
   background: linear-gradient(135deg, #96AEFF 0%, #7C9BFF 100%);
   box-shadow: 0 6px 14px rgba(124, 155, 255, 0.34);
 }
+.tab[data-tab="roomTemp"].active {
+  background: linear-gradient(135deg, #FFD5A8 0%, #F5B078 100%);
+  box-shadow: 0 6px 14px rgba(245, 176, 120, 0.34);
+}
 .tab[data-tab="meals"].active {
   background: linear-gradient(135deg, #FFCF70 0%, #F5B347 100%);
   box-shadow: 0 6px 14px rgba(245, 179, 71, 0.32);
@@ -239,8 +249,9 @@ body {
 }
 .tab .tab-emoji { font-size: 15px; line-height: 1; }
 
-@media (max-width: 390px) {
-  .tab { font-size: 10px; padding: 6px 0; letter-spacing: -0.5px; }
+@media (max-width: 420px) {
+  .tabs { gap: 2px; padding-left: 10px; padding-right: 10px; }
+  .tab { font-size: 10px; padding: 6px 0; letter-spacing: -0.6px; }
   .tab .tab-emoji { font-size: 14px; }
 }
 
@@ -380,6 +391,10 @@ body {
   border-color: var(--freeze-line);
   background: linear-gradient(180deg, #F8FBFF 0%, var(--freeze-bg) 100%);
 }
+.panel.room {
+  border-color: var(--room-line);
+  background: linear-gradient(180deg, #FFFBF4 0%, var(--room-bg) 100%);
+}
 
 /* ---------- item cards (2열) ---------- */
 .item-list {
@@ -399,6 +414,7 @@ body {
   box-shadow: var(--shadow-sm);
 }
 .item-card.is-frozen { border-color: #F1F5FF; }
+.item-card.is-room { border-color: #FBF0E2; }
 
 .card-top {
   display: flex;
@@ -418,6 +434,7 @@ body {
   border: 1px solid #E6F7F3;
 }
 .item-card.is-frozen .card-emoji { background: #F4F8FF; border-color: #E6EDFF; }
+.item-card.is-room .card-emoji { background: #FFF7EC; border-color: #FBEBD8; }
 
 .card-name {
   margin: 8px 0 0;
@@ -535,6 +552,7 @@ body {
 .dday.frozen,
 .dday.keep-frozen { color: var(--freeze-deep); background: #EDF2FF; border: 1px solid #DAE3FF; }
 .dday.keep-cold { color: var(--fridge-deep); background: #EAF8F5; border: 1px solid #CFEDE7; }
+.dday.keep-room { color: var(--room-deep); background: #FFF4E6; border: 1px solid #F8DFC2; }
 .dday.none { color: var(--ink-soft); background: #F6F2EC; border: 1px solid var(--line); }
 
 /* ---------- 점심 식단 연동 배너 ---------- */
@@ -1410,115 +1428,79 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .pantry-sec .sec-sub { margin: -2px 0 8px; color: #B3A387; }
-.pantry-room-title {
+.pantry-group {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 14px 0 0;
-  font-size: 11px;
-  font-weight: 800;
-  color: #A08966;
-}
-.pantry-room-count {
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: #F3EAD9;
-  color: #9C8358;
-  font-size: 9.5px;
-  font-weight: 800;
-}
-.pantry-room-empty {
-  margin: 12px 0 0;
-  padding: 9px 10px;
-  border-radius: 12px;
-  border: 1.5px dashed #EFE2C6;
-  background: #FFFDF6;
-  font-size: 10.5px;
-  font-weight: 600;
-  color: #B3A387;
-  line-height: 1.5;
-  word-break: keep-all;
-}
-.pantry-tools { display: flex; gap: 6px; margin-bottom: 6px; }
-.pantry-tool {
-  flex: 1 1 0;
-  padding: 7px 6px;
-  border-radius: 11px;
-  border: 1.5px solid #EFE6D8;
-  background: #FFFFFF;
-  color: #8D8579;
-  font-family: inherit;
-  font-size: 10.5px;
-  font-weight: 800;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.pantry-tool:active { transform: scale(0.97); }
-.pantry-group {
-  margin: 9px 0 5px;
+  margin: 11px 0 6px;
   font-size: 10.5px;
   font-weight: 800;
   color: #A9977A;
+}
+.pantry-body > .pantry-group:first-child { margin-top: 2px; }
+.pantry-group-count {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #F5EDDD;
+  color: #A08966;
+  font-size: 9.5px;
+  font-weight: 800;
 }
 .pantry-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
+/* 체크박스 없는 정적 칩 — 있는 조미료만 */
 .pantry-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 40px;
+  gap: 5px;
+  min-height: 31px;
   min-width: 0;
-  padding: 7px 9px;
-  border-radius: 12px;
-  border: 1.5px solid #EFE7DB;
+  padding: 6px 9px;
+  border-radius: 11px;
+  border: 1.5px solid #F2E9DB;
   background: #FFFFFF;
-  color: #8D8579;
-  font-family: inherit;
+  color: #6F6152;
   font-size: 11.5px;
   font-weight: 700;
-  text-align: left;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
+  line-height: 1.35;
 }
-.pantry-item .pi-box { flex: 0 0 auto; font-size: 12.5px; line-height: 1; }
 .pantry-item .pi-name { flex: 1 1 auto; min-width: 0; word-break: keep-all; }
-.pantry-item .pi-qty {
-  flex: 0 0 auto;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: #F4F0E7;
-  color: #9C9280;
-  font-size: 9.5px;
-  font-weight: 800;
-  white-space: nowrap;
+.pantry-item.off {
+  justify-content: center;
+  border-style: dashed;
+  border-color: #E8DDCB;
+  background: #FDFBF6;
+  color: #B7A997;
+  font-weight: 600;
 }
-.pantry-item.on .pi-qty { background: #D8F2E3; color: #2C9B71; }
-.pantry-item.on { border-color: #9CDCB6; background: #EAF9F0; color: #22835A; }
-.pantry-item:active { transform: scale(0.98); }
-.pantry-copy {
-  width: 100%;
-  margin-top: 11px;
-  padding: 11px 10px;
-  border: none;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #5FC79A 0%, #3FAE84 100%);
-  color: #FFFFFF;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-  box-shadow: 0 4px 10px rgba(63, 174, 132, 0.24);
-  -webkit-tap-highlight-color: transparent;
+/* 없는 것 — 흐린 점선 태그 한 줄 */
+.pantry-miss {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 13px;
+  padding-top: 10px;
+  border-top: 1.5px dashed #F0E4D1;
 }
-.pantry-copy.is-done { background: linear-gradient(135deg, #4BC08F 0%, #2C9B71 100%); }
-.pantry-copy:active { transform: scale(0.985); }
+.pantry-miss-head {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #B3A387;
+}
+.pantry-miss .pantry-item {
+  min-height: 27px;
+  padding: 4px 9px;
+  font-size: 10.5px;
+}
+/* 접힌 상태: 요약 한 줄만 남기고 칩은 숨겨요 */
 /* 접힌 상태: 요약 한 줄만 남기고 칩·도구는 숨겨요 */
 .pantry-sec.is-folded { padding: 11px 12px 12px; }
 .pantry-sec.is-folded .pantry-body { display: none; }
-.pantry-sec.is-folded .sec-sub { margin: -2px 0 0; }
+.pantry-sec.is-folded .sec-sub { display: none; }
 .pantry-sec:not(.is-folded) .pantry-summary { display: none; }
 
 /* ---------- desktop frame ---------- */

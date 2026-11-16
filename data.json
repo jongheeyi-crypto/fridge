@@ -1,6 +1,6 @@
 {
   "isSample": false,
-  "updatedAt": "2026-11-16T08:50:00+09:00",
+  "updatedAt": "2026-11-16T09:27:00+09:00",
   "fridge": [
     {
       "name": "[일미어담] 고등어구이 200g",
@@ -464,6 +464,136 @@
       "category": "아이 맞춤",
       "expiryDate": null,
       "memo": "어묵국·떡볶이용 (냉동)"
+    }
+  ],
+  "roomTemp": [
+    {
+      "name": "컵반 차돌된장찌개밥",
+      "emoji": "🍚",
+      "qty": "1개",
+      "category": "밀키트",
+      "expiryDate": null,
+      "memo": "전자레인지 2분 · 간편 한 끼"
+    },
+    {
+      "name": "컵반 미역국밥",
+      "emoji": "🍲",
+      "qty": "1개",
+      "category": "밀키트",
+      "expiryDate": null,
+      "memo": "전자레인지 2분 · 속 편한 한 끼"
+    },
+    {
+      "name": "비비고 사골곰탕",
+      "emoji": "🍜",
+      "qty": "3팩",
+      "category": "밀키트",
+      "expiryDate": null,
+      "memo": "데워서 밥 말아 먹기"
+    },
+    {
+      "name": "플라이밀 마녀스프 로제",
+      "emoji": "🥣",
+      "qty": "1팩",
+      "category": "밀키트",
+      "expiryDate": null,
+      "memo": "뜨거운 물만 부으면 완성"
+    },
+    {
+      "name": "플라이밀 마녀스프 토마토비프",
+      "emoji": "🍅",
+      "qty": "1팩",
+      "category": "밀키트",
+      "expiryDate": null,
+      "memo": "뜨거운 물만 부으면 완성"
+    },
+    {
+      "name": "카레여왕",
+      "emoji": "🍛",
+      "qty": "1팩",
+      "category": "밀키트",
+      "expiryDate": null,
+      "memo": "11/20(금) 저녁 카레용"
+    },
+    {
+      "name": "푸디버디 한우소고기무국",
+      "emoji": "🥘",
+      "qty": "1팩",
+      "category": "아이 맞춤",
+      "expiryDate": null,
+      "memo": "인성이 국물 반찬"
+    },
+    {
+      "name": "푸디버디 소고기장조림",
+      "emoji": "🍖",
+      "qty": "2팩",
+      "category": "아이 맞춤",
+      "expiryDate": null,
+      "memo": "반찬용 · 밥에 올려 주기"
+    },
+    {
+      "name": "룰루맘 치즈구마",
+      "emoji": "🍠",
+      "qty": "1팩 (10개입)",
+      "category": "아이 맞춤",
+      "expiryDate": null,
+      "memo": "인성이 간식 · 실온 보관"
+    },
+    {
+      "name": "룰루맘 리얼이구마",
+      "emoji": "🍡",
+      "qty": "1팩 (10개입)",
+      "category": "아이 맞춤",
+      "expiryDate": null,
+      "memo": "인성이 간식 · 실온 보관"
+    },
+    {
+      "name": "참치캔",
+      "emoji": "🐟",
+      "qty": "2캔",
+      "category": "생선·고기",
+      "expiryDate": null,
+      "memo": "주먹밥·볶음밥용"
+    },
+    {
+      "name": "건미역",
+      "emoji": "🌿",
+      "qty": "보유",
+      "category": "반찬·소스",
+      "expiryDate": null,
+      "memo": "미역국·무침용"
+    },
+    {
+      "name": "김자반",
+      "emoji": "🍙",
+      "qty": "보유",
+      "category": "반찬·소스",
+      "expiryDate": null,
+      "memo": "인성이 밥·주먹밥용"
+    },
+    {
+      "name": "가쓰오부시",
+      "emoji": "🍥",
+      "qty": "보유",
+      "category": "반찬·소스",
+      "expiryDate": null,
+      "memo": "육수·가쓰오 감칠맛용"
+    },
+    {
+      "name": "첵스초코",
+      "emoji": "🍫",
+      "qty": "보유",
+      "category": "아이 맞춤",
+      "expiryDate": null,
+      "memo": "인성이 시리얼 간식"
+    },
+    {
+      "name": "그래놀라",
+      "emoji": "🥜",
+      "qty": "보유",
+      "category": "유제품·빵",
+      "expiryDate": null,
+      "memo": "엄마 아침·요거트 토핑"
     }
   ],
   "meals": [
@@ -2205,8 +2335,8 @@
     ]
   },
   "pantry": {
-    "title": "🧺 실온·조미료",
-    "note": "조미료·부재료 체크는 이 폰에만 저장돼요 · 냉장 19 / 냉동 35 재고 숫자에는 넣지 않아요 · 찬장 실온 식품 16종도 이 섹션에 같이 담아요",
+    "title": "🧂 우리 집 조미료 · 부재료",
+    "note": "보유 중인 기본 조미료 37종 · 미보유 1종(쌈장) · 조미료는 냉장·냉동 재고 숫자에 넣지 않아요",
     "groups": [
       {
         "label": "장류·간장",
@@ -2380,119 +2510,6 @@
           },
           {
             "name": "혼다시",
-            "checked": true
-          }
-        ]
-      }
-    ],
-    "roomTemp": [
-      {
-        "label": "🍚 즉석밥·국·간편식",
-        "items": [
-          {
-            "name": "컵반 차돌된장찌개밥",
-            "qty": "1개",
-            "memo": "전자레인지 2분 · 간편 한 끼",
-            "checked": true
-          },
-          {
-            "name": "컵반 미역국밥",
-            "qty": "1개",
-            "memo": "전자레인지 2분 · 속 편한 한 끼",
-            "checked": true
-          },
-          {
-            "name": "비비고 사골곰탕",
-            "qty": "3팩",
-            "memo": "데워서 밥 말아 먹기",
-            "checked": true
-          },
-          {
-            "name": "플라이밀 마녀스프 로제",
-            "qty": "1팩",
-            "memo": "뜨거운 물만 부으면 완성",
-            "checked": true
-          },
-          {
-            "name": "플라이밀 마녀스프 토마토비프",
-            "qty": "1팩",
-            "memo": "뜨거운 물만 부으면 완성",
-            "checked": true
-          },
-          {
-            "name": "카레여왕",
-            "qty": "1팩",
-            "memo": "11/20(금) 저녁 카레용",
-            "checked": true
-          }
-        ]
-      },
-      {
-        "label": "👶 인성이용·어린이 반찬",
-        "items": [
-          {
-            "name": "푸디버디 한우소고기무국",
-            "qty": "1팩",
-            "memo": "인성이 국물 반찬",
-            "checked": true
-          },
-          {
-            "name": "푸디버디 소고기장조림",
-            "qty": "2팩",
-            "memo": "반찬용 · 밥에 올려 주기",
-            "checked": true
-          },
-          {
-            "name": "룰루맘 치즈구마",
-            "qty": "1팩 (10개입)",
-            "memo": "인성이 간식 · 실온 보관",
-            "checked": true
-          },
-          {
-            "name": "룰루맘 리얼이구마",
-            "qty": "1팩 (10개입)",
-            "memo": "인성이 간식 · 실온 보관",
-            "checked": true
-          }
-        ]
-      },
-      {
-        "label": "🥫 통조림·건어물·시리얼",
-        "items": [
-          {
-            "name": "참치캔",
-            "qty": "2캔",
-            "memo": "주먹밥·볶음밥용",
-            "checked": true
-          },
-          {
-            "name": "건미역",
-            "qty": "보유",
-            "memo": "미역국·무침용",
-            "checked": true
-          },
-          {
-            "name": "김자반",
-            "qty": "보유",
-            "memo": "인성이 밥·주먹밥용",
-            "checked": true
-          },
-          {
-            "name": "가쓰오부시",
-            "qty": "보유",
-            "memo": "육수·가쓰오 감칠맛용",
-            "checked": true
-          },
-          {
-            "name": "첵스초코",
-            "qty": "보유",
-            "memo": "인성이 시리얼 간식",
-            "checked": true
-          },
-          {
-            "name": "그래놀라",
-            "qty": "보유",
-            "memo": "엄마 아침·요거트 토핑",
             "checked": true
           }
         ]
