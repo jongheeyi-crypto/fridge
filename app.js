@@ -82,6 +82,14 @@
     return Math.round((t - todayUTC()) / 86400000);
   }
 
+  /* '2026-11-16' + 1 → '2026-11-17' (KST 기준 날짜만 더해요) */
+  function isoAdd(iso, n) {
+    var t = parseYMD(iso);
+    if (t === null) { return null; }
+    var d = new Date(t + n * 86400000);
+    return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate());
+  }
+
   function expiryLabel(s) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
     if (!m) { return ''; }
@@ -152,6 +160,29 @@
       .concat(itemsOf('roomTemp').map(function (i) { return { item: i, storage: 'roomTemp' }; }));
   }
 
+  /* 🧂 조미료·부재료 중 '보유'로 표시된 이름 (미보유 쌈장은 빼요) */
+  function pantryStockNames() {
+    var out = [];
+    pantryGroups().forEach(function (g) {
+      (g.items || []).forEach(function (it) {
+        if (it && it.name && it.checked !== false) { out.push(it.name); }
+      });
+    });
+    return out;
+  }
+
+  /* 먹는 재료 매칭용 전체 목록 — 🧺 실온 + 🧂 조미료(보유)까지 포함해요.
+     allItems()는 상단 배지 숫자에 쓰니까 조미료를 절대 섞지 않아요. */
+  function stockEntries() {
+    var out = allItems().map(function (x) {
+      return { name: x.item.name, storage: x.storage, item: x.item };
+    });
+    pantryStockNames().forEach(function (n) {
+      out.push({ name: n, storage: 'pantry', item: { name: n, pantry: true } });
+    });
+    return out;
+  }
+
   function matchesQuery(item) {
     var q = norm(state.q);
     if (!q) { return true; }
@@ -208,8 +239,8 @@
     /* 실온(roomTemp) 식품도 '지금 집에 있는 재료'로 봐요.
        이게 없으면 마녀스프·장조림처럼 실온에 둔 재료가
        식단 카드에서 🛒(없음)으로 잘못 떠요. */
-    var list = allItems().map(function (x) {
-      return { key: norm(x.item.name), arriving: x.item.arriving || null };
+    var list = stockEntries().map(function (x) {
+      return { key: norm(x.name), arriving: x.item.arriving || null };
     });
     return { list: list };
   }
@@ -346,12 +377,14 @@
         '<div class="card-top">' +
           '<span class="card-emoji" aria-hidden="true">' + esc(item.emoji || '🍽') + '</span>' +
           storageBadge(item, storage) +
+          (item.needsThaw ? '<span class="thaw-chip">🧊 전날 해동</span>' : '') +
         '</div>' +
         prio +
         arrivingPill(item) +
         '<h3 class="card-name">' + esc(item.name) + '</h3>' +
         '<div class="card-meta">' + qty + cat + '</div>' +
         memo +
+        (item.needsThaw && item.thawTip ? '<p class="card-thaw">🌙 ' + esc(item.thawTip) + '</p>' : '') +
       '</article>';
   }
 
@@ -414,6 +447,13 @@
     var ings = ingChips(meal.uses, stock);
     var adult = clashOf(meal, lunch);
     var kid = kidClashOf(meal, lunch);
+    var pairLine = '';
+    if (meal.pair && (meal.pair.side || meal.pair.soup)) {
+      pairLine = '<p class="pair-line">' +
+        (meal.pair.side ? '<span class="pl-side">🥬 ' + esc(meal.pair.side) + '</span>' : '') +
+        (meal.pair.soup ? '<span class="pl-soup">🥣 ' + esc(meal.pair.soup) + '</span>' : '') +
+      '</p>';
+    }
     var marks = '';
     if (isPriority(meal)) { marks += '<span class="meal-priority">🔥 냉장고 파먹기 1순위</span>'; }
     if (lunch && lunch.active) {
@@ -449,6 +489,7 @@
         (marks ? '<div class="meal-mark">' + marks + '</div>' : '') +
         (meal.memo ? '<p class="meal-memo">📝 ' + esc(meal.memo) + '</p>' : '') +
         (ings ? '<div class="ings">' + ings + '</div>' : '') +
+        pairLine +
         kidBox +
         (steps ? '<ol class="steps">' + steps + '</ol>' : '') +
       '</article>';
@@ -552,6 +593,130 @@
       monthDay(w.endDate || last.date, last.dayLabel);
   }
 
+  function findWeekDay(w, date) {
+    var days = (w && w.days) || [];
+    for (var i = 0; i < days.length; i++) {
+      if (days[i] && days[i].date === date) { return days[i]; }
+    }
+    return null;
+  }
+
+  /* ---------------- 🧊 전날 해동 알림 ---------------- */
+  /* 냉동실 품목 중 data.json에서 needsThaw: true 인 것만 해동 대상이에요.
+     식빵·돈가스·볶음밥처럼 해동 없이 바로 조리하는 건 붙이지 않았어요. */
+
+  var THAW_COURSES = [
+    { key: 'breakfast', label: '아침' },
+    { key: 'lunch', label: '점심' },
+    { key: 'dinner', label: '저녁' }
+  ];
+
+  function thawItems() {
+    return itemsOf('freezer').filter(function (it) { return !!(it && it.needsThaw); });
+  }
+
+  function thawMatch(label) {
+    var k = norm(label);
+    if (!k) { return null; }
+    var list = thawItems(), i, n;
+    for (i = 0; i < list.length; i++) {
+      if (norm(list[i].name) === k) { return list[i]; }
+    }
+    for (i = 0; i < list.length; i++) {
+      n = norm(list[i].name);
+      if (n.indexOf(k) !== -1 || k.indexOf(n) !== -1) { return list[i]; }
+    }
+    return null;
+  }
+
+  /* 한 끼니(메인·서브반찬·국·인성이 별도 + thawNotes)에서 해동할 냉동 재료를 모아요. */
+  function thawOfMeal(meal) {
+    if (!meal) { return []; }
+    var out = [], seen = {};
+    function add(name, tip) {
+      var k = norm(name);
+      if (!k || seen[k]) { return; }
+      seen[k] = true;
+      out.push({ name: name, tip: tip || '' });
+    }
+    [meal, meal.side, meal.soup, meal.kidMenu].forEach(function (m) {
+      if (!m) { return; }
+      (Array.isArray(m.uses) ? m.uses : []).forEach(function (u) {
+        var hit = thawMatch(u);
+        if (hit) { add(hit.name, hit.thawTip); }
+      });
+    });
+    (Array.isArray(meal.thawNotes) ? meal.thawNotes : []).forEach(function (t) {
+      if (t && t.name) { add(t.name, t.tip); }
+    });
+    return out;
+  }
+
+  /* 그날 실제로 먹는 끼니(❌ 패스·⏭️ 스킵·↪️ 밀려 들어온 메뉴 반영) 기준 해동 목록 */
+  function dayThawList(day, view) {
+    if (!day) { return []; }
+    var slots = (view && view[day.date]) || {};
+    var out = [], seen = {};
+    THAW_COURSES.forEach(function (c) {
+      var orig = day[c.key];
+      if (!orig || orig.skipped) { return; }
+      var sv = slots[c.key] || null;
+      if (sv && sv.state === 'passed') { return; }
+      var meal = (sv && sv.incoming && sv.incoming.meal) ? sv.incoming.meal : orig;
+      thawOfMeal(meal).forEach(function (t) {
+        var k = norm(t.name);
+        if (seen[k]) { return; }
+        seen[k] = true;
+        out.push({ name: t.name, tip: t.tip, course: c.key, courseLabel: c.label });
+      });
+    });
+    return out;
+  }
+
+  /* 오늘 밤 → 내일 식단의 해동 목록 */
+  function nextDayThaw(w, model, date) {
+    var next = findWeekDay(w, isoAdd(date, 1));
+    if (!next) { return null; }
+    var list = dayThawList(next, model.view);
+    if (!list.length) { return null; }
+    return { day: next, list: list };
+  }
+
+  /* 홈 상단 배너: 내일 해동할 재료가 있을 때만 떠요. */
+  function thawBanner() {
+    var w = weekPlan();
+    if (!w || !w.days.length) { return ''; }
+    var tomorrow = isoAdd(isoToday(), 1);
+    var day = findWeekDay(w, tomorrow);
+    var whenLabel = '내일';
+    if (!day) {
+      if (tomorrow > w.days[0].date) { return ''; }
+      day = w.days[0];
+      whenLabel = monthDay(day.date, day.dayLabel);
+    }
+    var list = dayThawList(day, computeWeekView(w).view);
+    if (!list.length) { return ''; }
+    var stamp = monthDay(day.date, day.dayLabel);
+    var rows = list.map(function (t) {
+      return '<li class="thaw-item">' +
+        '<span class="thaw-name">' + esc(t.name) + '</span>' +
+        '<span class="thaw-when">' + (whenLabel === '내일' ? '내일 ' : stamp + ' ') + esc(t.courseLabel) + '용</span>' +
+        (t.tip ? '<span class="thaw-tip">' + esc(t.tip) + '</span>' : '') +
+      '</li>';
+    }).join('');
+    var head = whenLabel === '내일' ? '내일 식단 해동 알림' : stamp + ' 식단 해동 알림';
+    return '' +
+      '<section class="section thaw-banner" id="thawBanner">' +
+        '<div class="thaw-head">' +
+          '<span class="thaw-emoji" aria-hidden="true">🧊</span>' +
+          '<span class="thaw-title">' + esc(head) + '</span>' +
+          '<span class="thaw-sub">🌙 오늘 밤 냉장실로!</span>' +
+        '</div>' +
+        '<ul class="thaw-list">' + rows + '</ul>' +
+        '<p class="thaw-note">냉동실에서 내려 두면 내일 조리가 3~8분이면 끝나요</p>' +
+      '</section>';
+  }
+
   function schoolEntry(date) {
     var lm = lunchData();
     if (!lm) { return null; }
@@ -574,12 +739,12 @@
   function findStockItem(label) {
     var k = norm(label);
     if (!k) { return null; }
-    var list = allItems(), i, n;
+    var list = stockEntries(), i, n;
     for (i = 0; i < list.length; i++) {
-      if (norm(list[i].item.name) === k) { return list[i].item; }
+      if (norm(list[i].name) === k) { return list[i].item; }
     }
     for (i = 0; i < list.length; i++) {
-      n = norm(list[i].item.name);
+      n = norm(list[i].name);
       if (n.indexOf(k) !== -1 || k.indexOf(n) !== -1) { return list[i].item; }
     }
     return null;
@@ -745,7 +910,7 @@
         var orig = d[course];
         var token = oxSlotKey(d.date, course);
         var st = map[token] || null;
-        var sv = { date: d.date, course: course, state: st, incoming: null, movedTo: null, fixed: false };
+    var sv = { date: d.date, course: course, state: st, incoming: null, movedTo: null, fixed: false, original: orig || null };
         view[d.date][course] = sv;
 
         if (orig && orig.skipped) {
@@ -1077,6 +1242,35 @@
     }
   }
 
+  /* 🥬 서브반찬 · 🥣 국 두 칸 박스 (주간 식단 슬롯용) */
+  function pairChips(uses) {
+    var list = Array.isArray(uses) ? uses : [];
+    if (!list.length) { return ''; }
+    var stock = inStock();
+    return '<span class="pair-ings">' + list.map(function (u) {
+      var st = stockState(u, stock);
+      return '<span class="pi ' + st + '">' +
+        (st === 'ok' ? '✅ ' : st === 'soon' ? '📦 ' : '🛒 ') + esc(u) + '</span>';
+    }).join('') + '</span>';
+  }
+
+  function pairCell(kind, c) {
+    if (!c || !c.title) { return ''; }
+    var isSoup = kind === 'soup';
+    return '<div class="pair-cell ' + (isSoup ? 'pc-soup' : 'pc-side') + '"' +
+      (c.note ? ' title="' + esc(c.note) + '"' : '') + '>' +
+      '<span class="pair-k">' + (isSoup ? '🥣 국' : '🥬 서브반찬') + '</span>' +
+      '<span class="pair-v">' + esc(c.title) + '</span>' +
+      pairChips(c.uses) +
+    '</div>';
+  }
+
+  function slotPair(meal) {
+    if (!meal) { return ''; }
+    var cells = pairCell('side', meal.side) + pairCell('soup', meal.soup);
+    return cells ? '<div class="slot-pair">' + cells + '</div>' : '';
+  }
+
   function weekSlot(kind, label, meal, entry, check, sv, w) {
     var incoming = (sv && sv.incoming && sv.incoming.meal) ? sv.incoming.meal : null;
     if (!meal && !incoming) { return ''; }
@@ -1115,6 +1309,12 @@
     var clash = (check && entry) ? clashWithEntry(shown, entry) : null;
     var kidClash = (check && entry && shown.kidMenu) ? clashWithEntry(shown.kidMenu, entry) : null;
     var chips = weekChips(shown.uses);
+    var pairBox = slotPair(shown);
+    var thawList = thawOfMeal(shown);
+    var thawLine = thawList.length
+      ? '<p class="slot-thaw">🧊 전날 해동 필요 · ' +
+        esc(thawList.map(function (t) { return t.name; }).join(' · ')) + '</p>'
+      : '';
     var mark = '';
     if (check && entry) {
       mark = (clash || kidClash)
@@ -1137,6 +1337,8 @@
         '</div>' +
         '<p class="slot-title">' + (shown.emoji ? esc(shown.emoji) + ' ' : '') + esc(shown.title || '') + '</p>' +
         movedIn +
+        thawLine +
+        pairBox +
         (state === 'eaten' ? '<p class="ox-eaten">⭕ 먹었어요</p>' : '') +
         (chips ? '<div class="ings">' + chips + '</div>' : '') +
         (mark ? '<div class="wmark-row">' + mark + '</div>' : '') +
@@ -1166,6 +1368,14 @@
       '</div>';
   }
 
+  /* 날짜 카드 하단 띠: 오늘 밤 해동할 게 있으면 알려줘요 */
+  function thawStrip(nd) {
+    var names = nd.list.slice(0, 2).map(function (t) { return t.name; }).join(' · ') +
+      (nd.list.length > 2 ? ' 외 ' + (nd.list.length - 2) : '');
+    return '<p class="thaw-strip">🧊 오늘 밤 냉장 해동 → 내일(' +
+      esc(nd.day.dayLabel || '') + ') ' + esc(names) + '</p>';
+  }
+
   function weekDayCard(day, w, model) {
     if (!day || !parseYMD(day.date)) { return ''; }
     var entry = schoolEntry(day.date);
@@ -1185,6 +1395,8 @@
     out.push(schoolSlot(entry));
     out.push(weekSlot('dinner', '🌙 세 가족 저녁', day.dinner, entry, true, v.dinner, w));
     out.push(weekSlot('snack', '🍪 주말 간식 (유치원 쉬는 날)', day.snack, entry, false, v.snack, w));
+    var thawNext = nextDayThaw(w, model, day.date);
+    if (thawNext) { out.push(thawStrip(thawNext)); }
     if (day.dayMemo) { out.push('<p class="day-memo">📝 ' + esc(day.dayMemo) + '</p>'); }
     out.push('</article>');
     return out.join('');
@@ -1291,10 +1503,18 @@
     var time = (!skip && shown.time && shown.time !== '-') ? '<span class="ht-mini">⏱ ' + esc(shown.time) + '</span>' : '';
     var kid = (shown.kidMenu && shown.kidMenu.title)
       ? '<span class="ht-kid">' + esc(shown.kidMenu.title) + '</span>' : '';
+    var pairLines = '';
+    if (!skip && shown.side && shown.side.title) {
+      pairLines += '<span class="ht-pair"><span class="htp-k">🥬 반찬</span>' + esc(shown.side.title) + '</span>';
+    }
+    if (!skip && shown.soup && shown.soup.title) {
+      pairLines += '<span class="ht-pair"><span class="htp-k">🥣 국</span>' + esc(shown.soup.title) + '</span>';
+    }
     return '<li class="' + cls + '">' +
       '<span class="ht-label">' + esc(label) + '</span>' +
       '<span class="ht-main">' +
         '<span class="ht-line">' + emoji + '<span class="ht-title">' + esc(shown.title || '') + '</span></span>' +
+        pairLines +
         ((time || tags) ? '<span class="ht-tags">' + time + tags + '</span>' : '') +
         kid +
       '</span>' +
@@ -1611,7 +1831,7 @@
         c.innerHTML = emptyAll();
         return;
       }
-      if (!searching) { parts.push(mealsSection(2)); }
+      if (!searching) { parts.push(thawBanner()); parts.push(mealsSection(2)); }
       else if (mealCount > 0) { parts.push(mealsSection(2)); }
       if (!searching) { parts.push(weekTeaser()); }
       parts.push(itemsSection('fridge', true));
