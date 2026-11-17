@@ -1243,6 +1243,84 @@ body {
 }
 .ox-copy:active, .ox-reset:active { transform: scale(0.985); }
 
+/* ---------- 🔗 가족 폰 실시간 동기화 ---------- */
+.ox-sync { display: flex; flex-direction: column; gap: 6px; margin: 0 0 8px; }
+.ox-sync-top { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.sync-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid #E7E1D8;
+  background: #FFFFFF;
+  font-size: 10px;
+  font-weight: 800;
+  color: #8D8579;
+  white-space: nowrap;
+}
+.sync-badge[data-state="online"] { border-color: #BFEBD2; background: #EAF9F0; color: #22835A; }
+.sync-badge[data-state="wait"] { border-color: #F0E0BE; background: #FDF7E8; color: #9A7B2F; }
+.ox-sync-btns { display: flex; gap: 5px; margin-left: auto; }
+.ox-mini {
+  padding: 5px 9px;
+  border-radius: 10px;
+  border: 1.5px solid #D6EDE0;
+  background: #FFFFFF;
+  color: #3E8C69;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+.ox-mini.ghost { border-color: #E9E2D8; color: #948B7F; }
+.ox-mini:active { transform: scale(0.97); }
+.ox-sync-more { font-size: 10px; color: #9A9088; }
+.ox-sync-more summary {
+  display: inline-block;
+  cursor: pointer;
+  font-weight: 700;
+  color: #A2968A;
+  list-style: none;
+}
+.ox-sync-more summary::-webkit-details-marker { display: none; }
+.ox-sync-more summary::before { content: "🔑 "; }
+.ox-sync-form { display: flex; gap: 5px; margin-top: 6px; }
+.ox-sync-form input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: 10px;
+  border: 1.5px solid #E7E1D8;
+  background: #FFFFFF;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--ink);
+}
+.ox-sync-form button {
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #7EC8FF 0%, #4E9BFF 100%);
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.ox-link-box {
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 10px;
+  border: 1.5px solid #E7E1D8;
+  background: #FFFFFF;
+  font-family: inherit;
+  font-size: 10px;
+  color: var(--ink-mid);
+}
+
 .ox-row { display: flex; gap: 6px; margin-top: 9px; }
 .ox-btn {
   flex: 1 1 0;

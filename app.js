@@ -803,6 +803,29 @@
   var OX_LABEL = { breakfast: '아침', lunch: '점심', dinner: '저녁' };
   var oxStore = null;
 
+  /* ↺ 초기화한 시각 — 다른 폰에도 '초기화했다'를 알리는 표시예요. */
+  var OX_RESET_KEY = 'insung_fridge_ox_reset_v1';
+
+  function localReset() {
+    try { return Number(window.localStorage.getItem(OX_RESET_KEY)) || 0; } catch (e) { return 0; }
+  }
+
+  function setLocalReset(v) {
+    try { window.localStorage.setItem(OX_RESET_KEY, String(Number(v) || 0)); } catch (e) { /* 무시 */ }
+  }
+
+  /* 저장된 체크가 몇 개인지 (주차별 빈 칸은 세지 않아요) */
+  function oxMapSize(map) {
+    return (map && typeof map === 'object' && !Array.isArray(map)) ? Object.keys(map).length : 0;
+  }
+
+  function oxWeekCount(store) {
+    var n = 0;
+    var all = store || {};
+    Object.keys(all).forEach(function (k) { n += oxMapSize(all[k]); });
+    return n;
+  }
+
   function oxSlotKey(date, course) { return date + '|' + course; }
 
   function loadOX() {
@@ -837,6 +860,8 @@
     } catch (e) {
       /* 저장이 막힌 브라우저에서는 이번 화면에서만 반영돼요 */
     }
+    /* 가족 방에 연결돼 있으면 클라우드에도 같이 보내요 (남의 기록을 받아온 직후엔 다시 보내지 않음) */
+    if (!sync.applying) { pushSoon(); }
   }
 
   function setOX(date, course, value) {
@@ -854,6 +879,7 @@
     if (!w) { return; }
     var all = oxAll();
     all[(w.startDate || 'week')] = {};
+    setLocalReset(Date.now());   /* 다른 폰에도 초기화가 바로 반영되도록 시각을 남겨요 */
     saveOX();
   }
 
@@ -998,7 +1024,9 @@
   }
 
   function oxBar(w, counts) {
-    var hint = '각 끼니의 ⭕/❌를 누르면 내 폰에서 바로 미뤄지고, 복사해서 피클에 보내면 남편 폰·재고도 같이 맞춰져요';
+    var hint = sync.room
+      ? '각 끼니의 ⭕/❌를 누르면 연결된 가족 폰에도 바로 반영돼요 · 재고 반영은 복사해서 피클에 보내기'
+      : '각 끼니의 ⭕/❌는 이 폰에 저장되고, 복사해서 피클에 보내면 남편 폰·재고도 같이 맞춰져요';
     var live = '';
     if (counts.total > 0) {
       live = '' +
@@ -1015,6 +1043,7 @@
     }
     return '' +
       '<div class="ox-bar' + (counts.total > 0 ? ' is-live' : '') + '" id="oxBar">' +
+        syncRow() +
         '<p class="ox-hint">💡 ' + esc(hint) + '</p>' +
         live +
       '</div>';
@@ -1143,6 +1172,399 @@
     clearOX();
     renderContent();
     oxToast('↺ 이번 주 체크를 모두 지웠어요');
+  }
+
+  /* ---------------- 🔗 가족 폰 실시간 동기화 (Firebase Realtime Database · 무료 Spark) ----------------
+     - 동기화하는 것은 주차별 ⭕/❌ 체크(OX_KEY)와 초기화 시각(resetAt) 뿐이에요.
+       재고·식단(data.json)은 그대로 두고, 재고 반영은 '📋 피클에 보낼 내용 복사'로 해요.
+     - 방 코드는 이 폰의 localStorage 에만 저장하고 주소창에서는 지워요(공개 저장소에 남기지 않음).
+     - 방이 연결되지 않았으면 예전처럼 로컬 전용으로만 동작해요. */
+
+  var ROOM_KEY = 'insung_fridge_room_v1';
+  var SHARE_BASE = 'https://jongheeyi-crypto.github.io/fridge/';
+  var SHARE_VER = '20261117a';
+  var MIN_ROOM_LEN = 12;
+  var FB_BASE = 'https://www.gstatic.com/firebasejs/11.6.0/';
+  var FB_CONFIG = {
+    apiKey: 'AIzaSyDNY7_-ZiyldaN0vKh_85PSgtDs1Vu-Ex4',
+    authDomain: 'insungstudy-family.firebaseapp.com',
+    databaseURL: 'https://insungstudy-family-default-rtdb.asia-southeast1.firebasedatabase.app',
+    projectId: 'insungstudy-family',
+    storageBucket: 'insungstudy-family.firebasestorage.app',
+    messagingSenderId: '998917381035',
+    appId: '1:998917381035:web:ee085bbf08f4272bc350ee'
+  };
+
+  var sync = {
+    room: null,
+    fb: null,
+    ref: null,
+    clientId: 'c' + Math.random().toString(36).slice(2, 10),
+    online: false,
+    subscribed: false,
+    lastAppliedAt: 0,
+    lastError: null,
+    applying: false,
+    pushTimer: null,
+    loading: null,
+    watchedConnected: false
+  };
+
+  var shareFallback = null;   /* 클립보드 복사가 막혔을 때 화면에 띄우는 링크 */
+
+  function storedRoom() {
+    try { return window.localStorage.getItem(ROOM_KEY) || ''; } catch (e) { return ''; }
+  }
+
+  function saveRoom(id) {
+    try {
+      if (id) { window.localStorage.setItem(ROOM_KEY, id); }
+      else { window.localStorage.removeItem(ROOM_KEY); }
+    } catch (e) { /* 저장 불가 환경 무시 */ }
+  }
+
+  function cleanRoomId(raw) {
+    if (typeof raw !== 'string') { return ''; }
+    var id = raw.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    return id.length >= MIN_ROOM_LEN ? id.slice(0, 64) : '';
+  }
+
+  function readRoomParam() {
+    try {
+      if (typeof window.URLSearchParams !== 'function') { return null; }
+      var room = new window.URLSearchParams(window.location.search).get('room');
+      return room ? String(room) : null;
+    } catch (e) { return null; }
+  }
+
+  function stripRoomParam() {
+    try {
+      if (typeof window.URL !== 'function') { return; }
+      var url = new window.URL(window.location.href);
+      if (!url.searchParams.has('room')) { return; }
+      url.searchParams.delete('room');
+      var q = url.searchParams.toString();
+      window.history.replaceState({}, document.title, url.pathname + (q ? '?' + q : '') + url.hash);
+    } catch (e) { /* 주소 정리 실패는 무시 */ }
+  }
+
+  /* Realtime Database 키에는 . # $ / [ ] 를 쓸 수 없어요.
+     주차·끼니 키에는 안 쓰지만, 나중에 어떤 문자가 들어와도 조용히 실패하지 않게 바꿔 두고 읽을 때 되돌려요. */
+  var KEY_ESCAPES = { '.': '%2E', '#': '%23', '$': '%24', '/': '%2F', '[': '%5B', ']': '%5D' };
+
+  function escapeKey(k) {
+    return String(k).replace(/[.#$/\[\]]/g, function (c) { return KEY_ESCAPES[c]; });
+  }
+
+  function unescapeKey(k) {
+    return String(k).replace(/%2E|%23|%24|%2F|%5B|%5D/g, function (m) {
+      var found = m;
+      Object.keys(KEY_ESCAPES).forEach(function (c) { if (KEY_ESCAPES[c] === m) { found = c; } });
+      return found;
+    });
+  }
+
+  function encodeForDb(value) {
+    if (Array.isArray(value)) { return value.map(encodeForDb); }
+    if (value && typeof value === 'object') {
+      var out = {};
+      Object.keys(value).forEach(function (k) { out[escapeKey(k)] = encodeForDb(value[k]); });
+      return out;
+    }
+    return value;
+  }
+
+  function decodeFromDb(value) {
+    if (Array.isArray(value)) { return value.map(decodeFromDb); }
+    if (value && typeof value === 'object') {
+      var out = {};
+      Object.keys(value).forEach(function (k) { out[unescapeKey(k)] = decodeFromDb(value[k]); });
+      return out;
+    }
+    return value;
+  }
+
+  function loadFirebase() {
+    if (!sync.loading) {
+      sync.loading = Promise.all([
+        import(FB_BASE + 'firebase-app.js'),
+        import(FB_BASE + 'firebase-auth.js'),
+        import(FB_BASE + 'firebase-database.js')
+      ]).then(function (mods) {
+        var app = mods[0].initializeApp(FB_CONFIG);
+        return {
+          app: app,
+          auth: mods[1].getAuth(app),
+          authApi: mods[1],
+          db: mods[2].getDatabase(app),
+          dbApi: mods[2]
+        };
+      });
+      sync.loading = sync.loading.then(null, function (err) {
+        sync.loading = null;
+        throw err;
+      });
+    }
+    return sync.loading;
+  }
+
+  function syncStatusName() {
+    if (!sync.room) { return 'off'; }
+    return (sync.online && sync.subscribed && !sync.lastError) ? 'online' : 'wait';
+  }
+
+  function syncStatusText(name) {
+    if (name === 'online') { return '🟢 실시간 연결됨'; }
+    if (name === 'wait') { return '🟡 연결 중·오프라인'; }
+    return '⚪ 이 기기만 저장 중';
+  }
+
+  function renderSync() {
+    var name = syncStatusName();
+    var badge = document.getElementById('oxSyncStatus');
+    if (badge) {
+      badge.setAttribute('data-state', name);
+      badge.textContent = syncStatusText(name);
+    }
+  }
+
+  /* 주간 식단 안내 바(oxBar)에 들어가는 동기화 줄 */
+  function syncRow() {
+    var name = syncStatusName();
+    var btns = '';
+    if (sync.room) {
+      btns = '' +
+        '<div class="ox-sync-btns">' +
+          '<button type="button" class="ox-mini" id="oxShare">🔗 남편 폰 링크 복사</button>' +
+          '<button type="button" class="ox-mini ghost" id="oxUnlink">해제</button>' +
+        '</div>';
+    }
+    var more = sync.room ? '' :
+      '<details class="ox-sync-more" id="oxSyncMore">' +
+        '<summary>가족 폰 코드로 연결</summary>' +
+        '<div class="ox-sync-form">' +
+          '<input type="text" id="oxRoomInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="동기화 코드를 붙여넣어 주세요" aria-label="동기화 코드" />' +
+          '<button type="button" id="oxConnect">연결</button>' +
+        '</div>' +
+      '</details>';
+    var fallback = shareFallback
+      ? '<input class="ox-link-box" id="oxLinkBox" type="text" readonly value="' + esc(shareFallback) + '" aria-label="복사할 동기화 링크" />'
+      : '';
+    return '' +
+      '<div class="ox-sync">' +
+        '<div class="ox-sync-top">' +
+          '<span class="sync-badge" id="oxSyncStatus" data-state="' + name + '">' + esc(syncStatusText(name)) + '</span>' +
+          btns +
+        '</div>' +
+        more + fallback +
+      '</div>';
+  }
+
+  function detachRoom() {
+    if (sync.ref) {
+      try { if (sync.fb) { sync.fb.dbApi.off(sync.ref); } } catch (e) { /* 무시 */ }
+    }
+    sync.ref = null;
+    sync.subscribed = false;
+    sync.lastAppliedAt = 0;
+    window.clearTimeout(sync.pushTimer);
+  }
+
+  function startRoom(id) {
+    if (!sync.fb || sync.room !== id || sync.ref) { return; }
+    var fb = sync.fb;
+    try {
+      if (!sync.watchedConnected) {
+        sync.watchedConnected = true;
+        var connRef = fb.dbApi.ref(fb.db, '.info/connected');
+        fb.dbApi.onValue(connRef, function (snap) {
+          sync.online = !!snap.val();
+          renderSync();
+        });
+      }
+      var roomRef = fb.dbApi.ref(fb.db, 'rooms/' + id);
+      sync.ref = roomRef;
+      fb.dbApi.onValue(roomRef, function (snap) {
+        if (sync.room !== id) { return; }
+        sync.subscribed = true;
+        sync.lastError = null;
+        renderSync();
+        onRemote(snap);
+      }, function (err) {
+        if (sync.room !== id) { return; }
+        sync.subscribed = false;
+        sync.lastError = String((err && (err.code || err.message)) || err);
+        renderSync();
+        if (sync.lastError.indexOf('permission') >= 0) {
+          oxToast('이 동기화 코드로는 들어갈 수 없어요 · 코드를 다시 확인해 주세요');
+        }
+      });
+      renderSync();
+    } catch (e) { renderSync(); }
+  }
+
+  function connectSync(roomId) {
+    var id = cleanRoomId(roomId);
+    if (!id) {
+      oxToast('동기화 코드가 올바르지 않아요 · 링크의 코드를 그대로 넣어 주세요');
+      return false;
+    }
+    detachRoom();
+    sync.room = id;
+    sync.online = false;
+    sync.subscribed = false;
+    sync.lastError = null;
+    shareFallback = null;
+    saveRoom(id);
+    renderContent();
+    renderSync();
+    loadFirebase().then(function (fb) {
+      sync.fb = fb;
+      if (sync.room !== id) { return; }
+      if (fb.auth.currentUser) { startRoom(id); return; }
+      return fb.authApi.signInAnonymously(fb.auth).then(function () { startRoom(id); }, function () {
+        if (sync.room !== id) { return; }
+        detachRoom();
+        sync.room = null;
+        saveRoom(null);
+        renderContent();
+        renderSync();
+        oxToast('동기화 로그인에 실패했어요 · 잠시 뒤 다시 연결해 주세요');
+      });
+    }).catch(function () {
+      if (sync.room !== id) { return; }
+      detachRoom();
+      sync.room = null;
+      saveRoom(null);
+      renderContent();
+      renderSync();
+      oxToast('지금은 동기화를 켤 수 없어요 · 이 기기에만 저장할게요');
+    });
+    return true;
+  }
+
+  function disconnectSync() {
+    detachRoom();
+    sync.room = null;
+    sync.online = false;
+    sync.lastError = null;
+    saveRoom(null);
+    renderContent();
+    renderSync();
+    oxToast('이 기기에만 저장하도록 바꿨어요 · 체크는 그대로 남아 있어요');
+  }
+
+  function pushNow() {
+    window.clearTimeout(sync.pushTimer);
+    if (!sync.ref || !sync.fb) { return; }
+    var payload = {
+      state: encodeForDb({ ox: oxAll(), resetAt: localReset() }),
+      updatedAt: sync.fb.dbApi.serverTimestamp(),
+      clientId: sync.clientId,
+      v: 1
+    };
+    try {
+      sync.fb.dbApi.set(sync.ref, payload).then(function () {
+        sync.lastError = null;
+        renderSync();
+      }, function (err) {
+        sync.lastError = String((err && (err.code || err.message)) || err);
+        try { console.warn('[fridge] 동기화 저장 실패:', sync.lastError); } catch (e2) { /* 무시 */ }
+        renderSync();
+      });
+    } catch (e) {
+      sync.lastError = 'sync:' + String(e && e.message);
+      try { console.warn('[fridge] 동기화 저장 오류:', sync.lastError); } catch (e2) { /* 무시 */ }
+      renderSync();
+    }
+  }
+
+  function pushSoon() {
+    if (!sync.ref) { return; }
+    window.clearTimeout(sync.pushTimer);
+    sync.pushTimer = window.setTimeout(pushNow, 260);
+  }
+
+  function applyRemote(remoteOx, remoteReset, remoteAt) {
+    var before = JSON.stringify(oxAll());
+    sync.applying = true;   /* 되돌아오는 메아리 방지: 저장만 하고 다시 올리지 않음 */
+    oxStore = remoteOx || {};
+    saveOX();
+    setLocalReset(remoteReset);
+    sync.applying = false;
+    sync.lastAppliedAt = Math.max(sync.lastAppliedAt, Number(remoteAt) || 0);
+    var changed = JSON.stringify(oxAll()) !== before;
+    shareFallback = null;
+    renderContent();
+    renderSync();
+    if (changed) { oxToast('🔄 가족 폰 기록과 맞췄어요'); }
+  }
+
+  function onRemote(snap) {
+    var data = snap.val();
+    var remoteAt = (data && data.updatedAt) ? Number(data.updatedAt) || 0 : 0;
+
+    /* 방이 아직 비었을 때: 이 폰에 체크가 있으면 올려서 기존 기록을 지켜요 */
+    if (!data) {
+      sync.lastAppliedAt = 0;
+      if (oxWeekCount(oxAll()) > 0) { pushNow(); }
+      return;
+    }
+    /* 내가 쓴 값이 되돌아온 것 */
+    if (data.clientId === sync.clientId) {
+      if (remoteAt > sync.lastAppliedAt) { sync.lastAppliedAt = remoteAt; }
+      return;
+    }
+    if (remoteAt && remoteAt <= sync.lastAppliedAt) { return; }
+
+    var payload = (data.state && typeof data.state === 'object') ? decodeFromDb(data.state) : null;
+    var remoteOx = (payload && payload.ox && typeof payload.ox === 'object' && !Array.isArray(payload.ox)) ? payload.ox : {};
+    var remoteReset = Number(payload && payload.resetAt) || 0;
+    var mineReset = localReset();
+
+    /* 초기화는 진행도보다 우선: 더 나중에 초기화한 쪽을 따라요 */
+    if (remoteReset > mineReset) { applyRemote(remoteOx, remoteReset, remoteAt); return; }
+    if (mineReset > remoteReset) {
+      sync.lastAppliedAt = Math.max(sync.lastAppliedAt, remoteAt);
+      pushNow();
+      return;
+    }
+
+    var remoteCount = oxWeekCount(remoteOx);
+    var myCount = oxWeekCount(oxAll());
+    /* 이 폰이 비었으면 클라우드 기록을 바로 받아요 (남편 폰이 처음 링크를 열었을 때) */
+    if (myCount === 0 && remoteCount > 0) { applyRemote(remoteOx, remoteReset, remoteAt); return; }
+    /* 상대가 비었는데 내게 체크가 있으면 내 기록을 올려요 */
+    if (remoteCount === 0 && myCount > 0) {
+      sync.lastAppliedAt = Math.max(sync.lastAppliedAt, remoteAt);
+      pushNow();
+      return;
+    }
+    /* 둘 다 기록이 있으면 더 최근에 저장된 쪽(updatedAt)을 따라요 */
+    applyRemote(remoteOx, remoteReset, remoteAt);
+  }
+
+  function syncLink() {
+    return sync.room ? SHARE_BASE + '?v=' + SHARE_VER + '&room=' + sync.room : '';
+  }
+
+  function copySyncLink() {
+    var link = syncLink();
+    if (!link) { oxToast('먼저 가족 폰 동기화를 연결해 주세요'); return; }
+    copyText(link, function (ok) {
+      if (ok) {
+        shareFallback = null;
+        renderContent();
+        oxToast('🔗 남편 폰 링크를 복사했어요 · 카톡에 붙여넣어 주세요');
+      } else {
+        shareFallback = link;
+        renderContent();
+        var box = document.getElementById('oxLinkBox');
+        if (box) { try { box.focus(); box.select(); } catch (e) { /* 무시 */ } }
+        oxToast('복사가 막혀서 화면에 링크를 띄웠어요 · 길게 눌러 복사해 주세요');
+      }
+      renderSync();
+    });
   }
 
   /* ---------------- 🧂 우리 집 조미료 · 부재료 (읽기 전용) ---------------- */
@@ -1912,6 +2334,18 @@
         }
         return;
       }
+      if (e.target.closest('#oxShare')) { copySyncLink(); return; }
+      if (e.target.closest('#oxUnlink')) { disconnectSync(); return; }
+      if (e.target.closest('#oxConnect')) {
+        var roomInput = document.getElementById('oxRoomInput');
+        var typed = roomInput ? roomInput.value : '';
+        if (connectSync(typed)) {
+          var fresh = document.getElementById('oxSyncStatus');
+          if (fresh) { fresh.textContent = syncStatusText('wait'); fresh.setAttribute('data-state', 'wait'); }
+          oxToast('가족 폰 동기화를 연결하는 중이에요…');
+        }
+        return;
+      }
       if (e.target.closest('#oxCopy')) { copyWeek(); return; }
       if (e.target.closest('#oxReset')) { resetWeek(); return; }
       /* 🧂 조미료 섹션은 읽기 전용 — 접기/펼치기만 반응해요 */
@@ -1946,6 +2380,15 @@
       renderContent();
     });
 
+    /* 동기화 코드 입력칸에서 Enter → 연결 */
+    el('content').addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') { return; }
+      if (!e.target.closest('#oxRoomInput')) { return; }
+      e.preventDefault();
+      var btn = document.getElementById('oxConnect');
+      if (btn) { btn.click(); }
+    });
+
     el('searchClear').addEventListener('click', function () {
       state.q = '';
       el('search').value = '';
@@ -1970,11 +2413,25 @@
         state.data = json;
         state.error = null;
         render();
+        bindRoom();
       })
       .catch(function (err) {
         state.error = (err && err.message) ? err.message : '데이터를 불러오지 못했어요';
         render();
+        bindRoom();
       });
+  }
+
+  /* 가족 폰 동기화 연결: 주소의 ?room= (한 번만 읽고 지움) > 이 폰에 저장된 코드 */
+  var roomBooted = false;
+  function bindRoom() {
+    if (roomBooted) { return; }
+    roomBooted = true;
+    var urlRoom = readRoomParam();
+    if (urlRoom !== null) { stripRoomParam(); }
+    var room = cleanRoomId(urlRoom) || cleanRoomId(storedRoom());
+    if (room) { connectSync(room); }
+    else { renderSync(); }
   }
 
   if (document.readyState === 'loading') {
@@ -1982,4 +2439,35 @@
   } else {
     boot();
   }
+
+  /* 테스트·확인용 (읽기 전용) */
+  window.__fridge = {
+    ox: function () { return JSON.parse(JSON.stringify(oxAll())); },
+    oxCount: function () { return oxWeekCount(oxAll()); },
+    resetAt: localReset,
+    tab: function (t) { state.tab = t; state.cat = '전체'; state.q = ''; render(); },
+    sync: {
+      room: function () { return sync.room; },
+      clientId: function () { return sync.clientId; },
+      link: syncLink,
+      status: function () {
+        return {
+          room: sync.room,
+          engineLoaded: !!sync.fb,
+          online: sync.online,
+          subscribed: sync.subscribed,
+          lastAppliedAt: sync.lastAppliedAt,
+          lastError: sync.lastError || null,
+          localCount: oxWeekCount(oxAll())
+        };
+      },
+      remote: function () {
+        if (!sync.ref || !sync.fb) { return Promise.resolve(null); }
+        return sync.fb.dbApi.get(sync.ref).then(function (s) { return s.val(); });
+      },
+      connect: connectSync,
+      disconnect: disconnectSync,
+      push: pushNow
+    }
+  };
 })();
