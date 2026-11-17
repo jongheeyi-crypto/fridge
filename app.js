@@ -803,15 +803,22 @@
   var OX_LABEL = { breakfast: '아침', lunch: '점심', dinner: '저녁' };
   var oxStore = null;
 
-  /* ↺ 초기화한 시각 — 다른 폰에도 '초기화했다'를 알리는 표시예요. */
+  /* ↺ 초기화한 시각 — 다른 폰에도 '초기화했다'를 알리는 표시예요.
+     앱이 지금 들고 있는 값을 메모리(localResetAt)에 두고 같이 저장해요.
+     (기기 안에서 창을 여러 개 열어도 내가 적용한 상태를 기준으로 비교하기 위해서예요) */
   var OX_RESET_KEY = 'insung_fridge_ox_reset_v1';
+  var localResetAt = null;
 
   function localReset() {
-    try { return Number(window.localStorage.getItem(OX_RESET_KEY)) || 0; } catch (e) { return 0; }
+    if (localResetAt === null) {
+      try { localResetAt = Number(window.localStorage.getItem(OX_RESET_KEY)) || 0; } catch (e) { localResetAt = 0; }
+    }
+    return localResetAt;
   }
 
   function setLocalReset(v) {
-    try { window.localStorage.setItem(OX_RESET_KEY, String(Number(v) || 0)); } catch (e) { /* 무시 */ }
+    localResetAt = Number(v) || 0;
+    try { window.localStorage.setItem(OX_RESET_KEY, String(localResetAt)); } catch (e) { /* 무시 */ }
   }
 
   /* 저장된 체크가 몇 개인지 (주차별 빈 칸은 세지 않아요) */
