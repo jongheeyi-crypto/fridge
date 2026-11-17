@@ -1189,7 +1189,7 @@
 
   var ROOM_KEY = 'insung_fridge_room_v1';
   var SHARE_BASE = 'https://jongheeyi-crypto.github.io/fridge/';
-  var SHARE_VER = '20261117a';
+  var SHARE_VER = '20261117b';
   var MIN_ROOM_LEN = 12;
   var FB_BASE = 'https://www.gstatic.com/firebasejs/11.6.0/';
   var FB_CONFIG = {
