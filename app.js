@@ -2467,7 +2467,13 @@
       },
       connect: connectSync,
       disconnect: disconnectSync,
-      push: pushNow
+      push: pushNow,
+      /* 테스트 전용 방(fridge-test-…)만 비울 수 있어요 */
+      wipe: function () {
+        if (!sync.ref || !sync.fb) { return Promise.reject(new Error('not connected')); }
+        if (sync.room.indexOf('fridge-test-') !== 0) { return Promise.reject(new Error('test room only')); }
+        return sync.fb.dbApi.set(sync.ref, null);
+      }
     }
   };
 })();
