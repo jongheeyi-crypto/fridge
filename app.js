@@ -1189,7 +1189,6 @@
 
   var ROOM_KEY = 'insung_fridge_room_v1';
   var SHARE_BASE = 'https://jongheeyi-crypto.github.io/fridge/';
-  var SHARE_VER = '20261117b';
   var MIN_ROOM_LEN = 12;
   var FB_BASE = 'https://www.gstatic.com/firebasejs/11.6.0/';
   var FB_CONFIG = {
@@ -1560,7 +1559,7 @@
   }
 
   function syncLink() {
-    return sync.room ? SHARE_BASE + '?v=' + SHARE_VER + '&room=' + sync.room : '';
+    return sync.room ? SHARE_BASE + '?room=' + sync.room : '';
   }
 
   function copySyncLink() {
@@ -2419,7 +2418,7 @@
     bind();
     render();
 
-    fetch('./data.json', { cache: 'no-store' })
+    fetch('./data.json?t=' + Date.now(), { cache: 'no-store' })
       .then(function (res) {
         if (!res.ok) { throw new Error('data.json (' + res.status + ')'); }
         return res.json();
