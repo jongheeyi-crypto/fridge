@@ -1206,6 +1206,7 @@
     room: null,
     fb: null,
     ref: null,
+    connRef: null,
     clientId: 'c' + Math.random().toString(36).slice(2, 10),
     online: false,
     subscribed: false,
@@ -1368,6 +1369,12 @@
   }
 
   function detachRoom() {
+    /* 다시 연결할 때 상태등이 굳어 있지 않도록, 연결 감시도 한번 제거하고 새로 닫아요 */
+    if (sync.connRef && sync.fb) {
+      try { sync.fb.dbApi.off(sync.connRef); } catch (e) { /* 무시 */ }
+    }
+    sync.connRef = null;
+    sync.watchedConnected = false;
     if (sync.ref) {
       try { if (sync.fb) { sync.fb.dbApi.off(sync.ref); } } catch (e) { /* 무시 */ }
     }
@@ -1383,8 +1390,8 @@
     try {
       if (!sync.watchedConnected) {
         sync.watchedConnected = true;
-        var connRef = fb.dbApi.ref(fb.db, '.info/connected');
-        fb.dbApi.onValue(connRef, function (snap) {
+        sync.connRef = fb.dbApi.ref(fb.db, '.info/connected');
+        fb.dbApi.onValue(sync.connRef, function (snap) {
           sync.online = !!snap.val();
           renderSync();
         });
@@ -1473,6 +1480,7 @@
     try {
       sync.fb.dbApi.set(sync.ref, payload).then(function () {
         sync.lastError = null;
+        sync.online = true;   /* 저장이 성공했으면 연결은 살아 있어요 */
         renderSync();
       }, function (err) {
         sync.lastError = String((err && (err.code || err.message)) || err);
